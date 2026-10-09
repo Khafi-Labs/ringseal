@@ -1,0 +1,291 @@
+openapi: 3.0.3
+info:
+  title: Ringseal API
+  version: 0.1.0
+  description: >
+    Ringseal is a multi-tenant caller-verification API for banks.
+    Agents create sessions with 6-digit codes, and customers verify in their bank app.
+    
+    ## Webhooks
+    When a tenant has a `webhook_url`, Ringseal sends a POST when a customer views a session (`session.viewed`).
+    Headers: `X-Ringseal-Event-Id`, `X-Ringseal-Timestamp`, `X-Ringseal-Signature` (hex HMAC-SHA256 of the body, keyed with the server's MASTER_SECRET in v0.1).
+
+    Webhook payload format:
+    ```json
+    {
+      "event_id": "uuid",
+      "event": "session.viewed",
+      "tenant_id": "uuid",
+      "session_id": "uuid",
+      "timestamp": "iso8601",
+      "data": {"ip_address": "string", "user_agent": "string"}
+    }
+    ```
+servers:
+  - url: http://localhost:8080
+    description: Development server
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+    AdminAuth:
+      type: apiKey
+      in: header
+      name: X-Admin-Secret
+  schemas:
+    SessionCreateRequest:
+      type: object
+      required:
+        - customer_ref
+        - agent_ref
+      properties:
+        customer_ref:
+          type: string
+          example: "cust_123456"
+        agent_ref:
+          type: string
+          example: "agent_789"
+    SessionCreateResponse:
+      type: object
+      properties:
+        session_id:
+          type: string
+          format: uuid
+        code:
+          type: string
+          pattern: '^[0-9]{6}$'
+          example: "123456"
+        expires_at:
+          type: string
+          format: date-time
+    SessionDetails:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        tenant_id:
+          type: string
+          format: uuid
+        customer_ref:
+          type: string
+        agent_ref:
+          type: string
+        status:
+          type: string
+          enum: [active, ended, expired]
+        created_at:
+          type: string
+          format: date-time
+        ended_at:
+          type: string
+          format: date-time
+    SessionEndResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          example: "ended"
+    VerifyResponse:
+      type: object
+      properties:
+        session_id:
+          type: string
+          format: uuid
+        code:
+          type: string
+        expires_at:
+          type: string
+          format: date-time
+        status:
+          type: string
+    TenantCreateRequest:
+      type: object
+      required:
+        - name
+      properties:
+        name:
+          type: string
+          example: "Acme Bank"
+        webhook_url:
+          type: string
+          format: uri
+          example: "https://api.acmebank.com/webhooks/ringseal"
+    TenantCreateResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        api_key:
+          type: string
+    HealthResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          example: "ok"
+        version:
+          type: string
+          example: "0.1.0"
+        timestamp:
+          type: string
+          format: date-time
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+paths:
+  /api/v1/sessions:
+    post:
+      summary: Create a verification session
+      security:
+        - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SessionCreateRequest'
+      responses:
+        '201':
+          description: Session created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SessionCreateResponse'
+        '400':
+          description: Bad request
+        '401':
+          description: Unauthorized
+        '429':
+          description: Too many requests
+  /api/v1/sessions/{id}:
+    get:
+      summary: Get session details
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Session details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SessionDetails'
+        '401':
+          description: Unauthorized
+        '404':
+          description: Not found
+  /api/v1/sessions/{id}/end:
+    post:
+      summary: End a session
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Session ended
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SessionEndResponse'
+        '401':
+          description: Unauthorized
+        '404':
+          description: Not found
+  /api/v1/sessions/active:
+    get:
+      summary: Get active session for a customer
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - in: query
+          name: customer_ref
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Active session details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SessionDetails'
+        '401':
+          description: Unauthorized
+        '404':
+          description: Not found
+  /api/v1/verify:
+    get:
+      summary: Customer SDK - get active session code for verification display
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Verification code details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VerifyResponse'
+        '401':
+          description: Unauthorized
+        '404':
+          description: Not found
+  /internal/v1/tenants:
+    post:
+      summary: Create a new tenant
+      description: Served only on the internal listener (127.0.0.1, INTERNAL_PORT, default 9090). It is not part of the public API on port 8080.
+      security:
+        - AdminAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TenantCreateRequest'
+      responses:
+        '201':
+          description: Tenant created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TenantCreateResponse'
+        '400':
+          description: Bad request
+        '401':
+          description: Unauthorized
+  /api/v1/health:
+    get:
+      summary: Health check
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'

@@ -1,0 +1,667 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Demo Bank App</title>
+    <style>
+        :root {
+            --bank-green: #00a86b;
+            --bg-color: #f2f2f7;
+            --card-bg: #ffffff;
+            --text-main: #1c1c1e;
+            --text-muted: #8e8e93;
+            --danger: #ff3b30;
+            --safe: #34c759;
+            --border: #e5e5ea;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, Helvetica, sans-serif;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            background-color: #333; /* Dark background behind the phone frame */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+        }
+
+        /* Mobile App Frame */
+        #app-frame {
+            width: 100%;
+            max-width: 420px;
+            height: 100vh;
+            max-height: 850px;
+            background-color: var(--bg-color);
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+        }
+
+        @media (min-width: 421px) {
+            #app-frame {
+                height: 90vh;
+                border-radius: 40px;
+                border: 8px solid #1a1a1a;
+            }
+        }
+
+        /* Views */
+        .view {
+            display: none;
+            flex-direction: column;
+            height: 100%;
+            width: 100%;
+        }
+
+        .view.active {
+            display: flex;
+            animation: fade-in 0.3s ease-out;
+        }
+
+        @keyframes fade-in {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Header */
+        header {
+            background-color: var(--card-bg);
+            padding: 3rem 1.5rem 1rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 1px 0 rgba(0,0,0,0.05);
+            z-index: 10;
+        }
+
+        .header-title {
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: var(--text-main);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .icon-btn {
+            background: none;
+            border: none;
+            font-size: 1.25rem;
+            color: var(--text-main);
+            cursor: pointer;
+            padding: 0.5rem;
+        }
+
+        /* Content Area */
+        .content {
+            flex: 1;
+            padding: 1.5rem;
+            overflow-y: auto;
+        }
+
+        /* Cards */
+        .card {
+            background-color: var(--card-bg);
+            border-radius: 16px;
+            padding: 1.5rem;
+            margin-bottom: 1rem;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+        }
+
+        .card-header {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            margin-bottom: 1rem;
+            font-weight: 600;
+            color: var(--text-main);
+            font-size: 1.1rem;
+        }
+
+        /* Forms & Buttons */
+        .form-group {
+            margin-bottom: 1rem;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            font-weight: 500;
+        }
+
+        input {
+            width: 100%;
+            padding: 1rem;
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            font-size: 1rem;
+            background-color: #fafafa;
+            transition: border-color 0.2s;
+        }
+
+        input:focus {
+            outline: none;
+            border-color: var(--bank-green);
+            background-color: #fff;
+        }
+
+        .btn-primary {
+            background-color: var(--bank-green);
+            color: white;
+            border: none;
+            padding: 1rem;
+            border-radius: 12px;
+            font-size: 1rem;
+            font-weight: 600;
+            width: 100%;
+            cursor: pointer;
+            transition: opacity 0.2s;
+        }
+
+        .btn-primary:active {
+            opacity: 0.8;
+        }
+
+        .btn-secondary {
+            background-color: transparent;
+            color: var(--bank-green);
+            border: 2px solid var(--bank-green);
+            padding: 1rem;
+            border-radius: 12px;
+            font-size: 1rem;
+            font-weight: 600;
+            width: 100%;
+            cursor: pointer;
+        }
+
+        /* Verification Screen Specifics */
+        .code-container {
+            display: flex;
+            justify-content: center;
+            gap: 0.5rem;
+            margin: 2rem 0;
+        }
+
+        .digit-box {
+            width: 3rem;
+            height: 4rem;
+            background-color: #f0f0f0;
+            border-radius: 8px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 2rem;
+            font-weight: 700;
+            font-family: monospace;
+            color: var(--text-main);
+            border: 1px solid var(--border);
+        }
+
+        .glowing .digit-box {
+            animation: pulse-glow 2s infinite alternate;
+            border-color: var(--bank-green);
+            background-color: rgba(0, 168, 107, 0.05);
+            color: var(--bank-green);
+        }
+
+        @keyframes pulse-glow {
+            0% { box-shadow: 0 0 0 0 rgba(0, 168, 107, 0.4); }
+            100% { box-shadow: 0 0 10px 2px rgba(0, 168, 107, 0.2); }
+        }
+
+        .security-banner {
+            background-color: #fff3cd;
+            color: #856404;
+            padding: 1rem;
+            border-radius: 12px;
+            font-size: 0.85rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-top: 1rem;
+        }
+
+        /* Bottom Nav */
+        .bottom-nav {
+            background-color: var(--card-bg);
+            display: flex;
+            justify-content: space-around;
+            padding: 1rem 0 1.5rem;
+            border-top: 1px solid var(--border);
+            z-index: 10;
+        }
+
+        .nav-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            color: var(--text-muted);
+            font-size: 0.7rem;
+            gap: 0.25rem;
+        }
+
+        .nav-item.active {
+            color: var(--bank-green);
+        }
+
+        .nav-icon {
+            font-size: 1.5rem;
+        }
+
+        /* Settings Overlay */
+        #settings-overlay {
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 100;
+            display: none;
+            justify-content: center;
+            align-items: flex-end;
+        }
+
+        #settings-overlay.active {
+            display: flex;
+        }
+
+        .settings-modal {
+            background: var(--card-bg);
+            width: 100%;
+            border-radius: 24px 24px 0 0;
+            padding: 2rem 1.5rem;
+            animation: slide-up 0.3s ease-out;
+        }
+
+        @keyframes slide-up {
+            from { transform: translateY(100%); }
+            to { transform: translateY(0); }
+        }
+
+        .status-card {
+            text-align: center;
+            padding: 2rem 1rem;
+        }
+
+        .safe-icon {
+            font-size: 4rem;
+            color: var(--safe);
+            margin-bottom: 1rem;
+        }
+
+        /* Toast */
+        .toast {
+            position: absolute;
+            top: 5rem;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.8);
+            color: white;
+            padding: 0.75rem 1.5rem;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            z-index: 200;
+            transition: opacity 0.3s;
+            opacity: 0;
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="app-frame">
+        <div style="background-color: var(--danger); color: white; padding: 10px; text-align: center; font-weight: bold; font-size: 0.8rem; z-index: 100;">
+            ⚠️ DEMO ONLY — API keys are stored in your browser for convenience. In production, keys must NEVER be sent to a browser.
+        </div>
+        
+        <!-- Header -->
+        <header id="app-header" style="display: none;">
+            <div class="header-title">
+                🏦 Demo Bank
+            </div>
+            <div>
+                <button class="icon-btn">🔔</button>
+                <button class="icon-btn" onclick="toggleSettings()">⚙️</button>
+            </div>
+        </header>
+
+        <!-- View: Login -->
+        <div id="view-login" class="view active">
+            <div style="flex: 1; display: flex; flex-direction: column; justify-content: center; padding: 2rem;">
+                <div style="text-align: center; margin-bottom: 3rem;">
+                    <div style="font-size: 4rem; margin-bottom: 1rem;">🏦</div>
+                    <h1 style="color: var(--text-main); font-size: 1.75rem;">Welcome to Demo Bank</h1>
+                    <p style="color: var(--text-muted); margin-top: 0.5rem;">Secure Banking App</p>
+                </div>
+
+                <div class="card">
+                    <div class="form-group">
+                        <label>Customer ID</label>
+                        <input type="text" id="customerId" placeholder="e.g., cust_12345" value="cust_12345">
+                    </div>
+                    <button class="btn-primary" onclick="handleLogin()">Log In</button>
+                </div>
+                <div style="text-align: center; margin-top: 1rem;">
+                    <button class="icon-btn" style="font-size: 0.85rem; color: var(--text-muted);" onclick="toggleSettings()">⚙️ App Configuration</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- View: Main -->
+        <div id="view-main" class="view">
+            <div class="content">
+                <h2 style="margin-bottom: 1.5rem; color: var(--text-main);">Accounts</h2>
+                
+                <div class="card" style="background: linear-gradient(135deg, var(--bank-green), #008f5a); color: white;">
+                    <p style="font-size: 0.85rem; opacity: 0.9;">Checking Account</p>
+                    <h3 style="font-size: 2rem; margin: 0.5rem 0;">$12,450.00</h3>
+                    <p style="font-size: 0.85rem; opacity: 0.9;">•••• 4321</p>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        🛡️ Caller Verification
+                    </div>
+                    <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 1.5rem;">
+                        Are you on a call with someone claiming to be from the bank? Verify their identity here.
+                    </p>
+                    <button class="btn-secondary" onclick="checkVerification()">Check for Active Call</button>
+                </div>
+
+                <h3 style="font-size: 1rem; color: var(--text-main); margin: 1.5rem 0 1rem;">Recent Transactions</h3>
+                <div class="card" style="padding: 1rem;">
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 1rem;">
+                        <div>
+                            <strong>Coffee Shop</strong>
+                            <div style="font-size: 0.8rem; color: var(--text-muted);">Today</div>
+                        </div>
+                        <div style="font-weight: 600;">-$4.50</div>
+                    </div>
+                    <hr style="border: none; border-top: 1px solid var(--border); margin: 0.5rem 0;">
+                    <div style="display: flex; justify-content: space-between;">
+                        <div>
+                            <strong>Salary Deposit</strong>
+                            <div style="font-size: 0.8rem; color: var(--text-muted);">Yesterday</div>
+                        </div>
+                        <div style="font-weight: 600; color: var(--bank-green);">+$3,200.00</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bottom-nav">
+                <div class="nav-item active">
+                    <div class="nav-icon">🏠</div>
+                    <span>Home</span>
+                </div>
+                <div class="nav-item">
+                    <div class="nav-icon">💳</div>
+                    <span>Cards</span>
+                </div>
+                <div class="nav-item">
+                    <div class="nav-icon">💸</div>
+                    <span>Transfers</span>
+                </div>
+                <div class="nav-item" onclick="logout()" style="cursor: pointer;">
+                    <div class="nav-icon">🚪</div>
+                    <span>Logout</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- View: Verification Status -->
+        <div id="view-verification" class="view">
+            <div class="content">
+                <button class="icon-btn" onclick="showView('view-main')" style="margin-bottom: 1rem;">← Back</button>
+                
+                <div id="status-container">
+                    <!-- Dynamic content injected here -->
+                    <div class="card status-card">
+                        <div style="font-size: 2rem; animation: rotate 2s linear infinite;">⏳</div>
+                        <p style="margin-top: 1rem;">Checking for active calls...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Settings Modal -->
+        <div id="settings-overlay" onclick="if(event.target===this) toggleSettings()">
+            <div class="settings-modal">
+                <h3 style="margin-bottom: 1.5rem;">Demo Configuration</h3>
+                <div class="form-group">
+                    <label>API Base URL</label>
+                    <input type="text" id="cfgApiUrl" value="http://localhost:8080">
+                </div>
+                <div class="form-group">
+                    <label>JWT Secret (for local token generation)</label>
+                    <input type="password" id="cfgJwtSecret" value="demo_secret_key_12345">
+                </div>
+                <button class="btn-primary" onclick="saveSettings()">Save & Close</button>
+            </div>
+        </div>
+
+        <div class="toast" id="toast">Message</div>
+
+    </div>
+
+    <script>
+        // Config & State
+        const config = {
+            apiUrl: localStorage.getItem('demoapp_api_url') || 'http://localhost:8080',
+            jwtSecret: localStorage.getItem('demoapp_jwt_secret') || 'demo_secret_key_12345'
+        };
+        let currentToken = null;
+        let pollInterval = null;
+
+        document.getElementById('cfgApiUrl').value = config.apiUrl;
+        document.getElementById('cfgJwtSecret').value = config.jwtSecret;
+
+        // UI Helpers
+        function showView(viewId) {
+            document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+            document.getElementById(viewId).classList.add('active');
+            
+            const header = document.getElementById('app-header');
+            if (viewId === 'view-login') {
+                header.style.display = 'none';
+                stopPolling();
+            } else {
+                header.style.display = 'flex';
+            }
+        }
+
+        function toggleSettings() {
+            const overlay = document.getElementById('settings-overlay');
+            overlay.classList.toggle('active');
+        }
+
+        function saveSettings() {
+            config.apiUrl = document.getElementById('cfgApiUrl').value;
+            config.jwtSecret = document.getElementById('cfgJwtSecret').value;
+            localStorage.setItem('demoapp_api_url', config.apiUrl);
+            localStorage.setItem('demoapp_jwt_secret', config.jwtSecret);
+            toggleSettings();
+            showToast('Settings saved');
+        }
+
+        function showToast(msg) {
+            const toast = document.getElementById('toast');
+            toast.innerText = msg;
+            toast.style.opacity = '1';
+            setTimeout(() => { toast.style.opacity = '0'; }, 2000);
+        }
+
+        // Minimal HS256 JWT Generator via Web Crypto API
+        async function generateDemoJwt(customerRef) {
+            const header = { alg: 'HS256', typ: 'JWT' };
+            const payload = {
+                tenant_id: 'demo',
+                customer_ref: customerRef,
+                exp: Math.floor(Date.now() / 1000) + (60 * 60) // 1 hour
+            };
+
+            const enc = new TextEncoder();
+            const key = await crypto.subtle.importKey(
+                'raw',
+                enc.encode(config.jwtSecret),
+                { name: 'HMAC', hash: 'SHA-256' },
+                false,
+                ['sign']
+            );
+
+            const base64url = (str) => btoa(str).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+            const headerB64 = base64url(JSON.stringify(header));
+            const payloadB64 = base64url(JSON.stringify(payload));
+            
+            const data = `${headerB64}.${payloadB64}`;
+            const signature = await crypto.subtle.sign('HMAC', key, enc.encode(data));
+            const signatureB64 = base64url(String.fromCharCode(...new Uint8Array(signature)));
+            
+            return `${data}.${signatureB64}`;
+        }
+
+        // Actions
+        async function handleLogin() {
+            const customerId = document.getElementById('customerId').value;
+            if (!customerId) {
+                showToast('Please enter a Customer ID');
+                return;
+            }
+
+            try {
+                // Generate a mock JWT for demo purposes
+                currentToken = await generateDemoJwt(customerId);
+                showView('view-main');
+            } catch (err) {
+                console.error(err);
+                showToast('Login failed');
+            }
+        }
+
+        function logout() {
+            currentToken = null;
+            stopPolling();
+            showView('view-login');
+        }
+
+        function checkVerification() {
+            showView('view-verification');
+            renderLoading();
+            fetchVerificationStatus();
+            startPolling();
+        }
+
+        function startPolling() {
+            stopPolling();
+            pollInterval = setInterval(fetchVerificationStatus, 3000);
+        }
+
+        function stopPolling() {
+            if (pollInterval) {
+                clearInterval(pollInterval);
+                pollInterval = null;
+            }
+        }
+
+        async function fetchVerificationStatus() {
+            if (!currentToken) return;
+
+            try {
+                const response = await fetch(`${config.apiUrl}/api/v1/verify`, {
+                    headers: {
+                        'Authorization': `Bearer ${currentToken}`
+                    }
+                });
+
+                if (response.status === 404 || response.status === 204) {
+                    renderNoActiveCall();
+                    return;
+                }
+
+                if (!response.ok) {
+                    throw new Error('API Error');
+                }
+
+                const data = await response.json();
+                
+                // Assuming data contains the session with a code
+                if (data.status === 'active' || data.status === 'created') {
+                    renderActiveCall(data);
+                } else {
+                    renderNoActiveCall();
+                }
+
+            } catch (err) {
+                console.error(err);
+                // For demo resilience, if API is down, show safe state
+                renderNoActiveCall();
+            }
+        }
+
+        function renderLoading() {
+            const container = document.getElementById('status-container');
+            container.innerHTML = `
+                <div class="card status-card">
+                    <div style="font-size: 3rem; margin-bottom: 1rem;">⏳</div>
+                    <h3 style="color: var(--text-main);">Checking status...</h3>
+                </div>
+            `;
+        }
+
+        function renderNoActiveCall() {
+            const container = document.getElementById('status-container');
+            container.innerHTML = `
+                <div class="card status-card" style="border: 2px solid var(--safe); background: #f0fdf4;">
+                    <div class="safe-icon">✓</div>
+                    <h2 style="color: #166534; margin-bottom: 0.5rem;">No Active Verification</h2>
+                    <p style="color: #166534; font-size: 0.95rem;">
+                        If someone is currently on the phone claiming to be from Demo Bank, <strong>they are NOT verified</strong>. Please hang up immediately.
+                    </p>
+                </div>
+            `;
+        }
+
+        function renderActiveCall(session) {
+            const container = document.getElementById('status-container');
+            
+            // Format code into separate boxes
+            const code = session.code || "------";
+            const digitsHtml = code.split('').map(d => `<div class="digit-box">${d}</div>`).join('');
+
+            container.innerHTML = `
+                <div class="card" style="text-align: center;">
+                    <div style="font-size: 3rem; margin-bottom: 1rem; color: var(--bank-green);">📞</div>
+                    <h2 style="color: var(--text-main); margin-bottom: 0.5rem;">Your bank is calling you</h2>
+                    <p style="color: var(--text-muted); font-size: 0.9rem;">
+                        Compare this code with what the agent tells you.
+                    </p>
+
+                    <div class="code-container glowing">
+                        ${digitsHtml}
+                    </div>
+
+                    <div class="security-banner">
+                        <span>⚠️</span>
+                        <strong>Never read this code aloud. Your bank will never ask you to share your screen.</strong>
+                    </div>
+                </div>
+            `;
+            
+            // Screen mirror detection simulation
+            if (navigator.mediaDevices && navigator.mediaDevices.getDisplayMedia) {
+                // We could check permissions or states here.
+            }
+        }
+
+    </script>
+</body>
+</html>

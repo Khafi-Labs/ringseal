@@ -1,0 +1,586 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Demo Bank - Agent Console</title>
+    <style>
+        :root {
+            --primary: #1a1a2e;
+            --accent: #0066ff;
+            --bg: #f4f6f8;
+            --text: #333;
+            --border: #e0e4e8;
+            --success: #28a745;
+            --error: #dc3545;
+            --warning: #ffc107;
+            --info: #17a2b8;
+            --card-bg: #ffffff;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        }
+
+        body {
+            background-color: var(--bg);
+            color: var(--text);
+            line-height: 1.6;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+
+        header {
+            background-color: var(--primary);
+            color: white;
+            padding: 1rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .header-title {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .badge {
+            background-color: var(--accent);
+            color: white;
+            padding: 0.25rem 0.75rem;
+            border-radius: 1rem;
+            font-size: 0.875rem;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+        }
+
+        .main-container {
+            flex: 1;
+            padding: 2rem;
+            max-width: 1200px;
+            margin: 0 auto;
+            width: 100%;
+            display: grid;
+            grid-template-columns: 1fr 2fr;
+            gap: 2rem;
+        }
+
+        .card {
+            background: var(--card-bg);
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+            padding: 1.5rem;
+            border: 1px solid var(--border);
+        }
+
+        .card-title {
+            font-size: 1.25rem;
+            margin-bottom: 1.5rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 1px solid var(--border);
+            color: var(--primary);
+        }
+
+        .form-group {
+            margin-bottom: 1rem;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 500;
+            color: #555;
+        }
+
+        input[type="text"], input[type="password"], input[type="url"] {
+            width: 100%;
+            padding: 0.75rem;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            font-size: 1rem;
+            transition: border-color 0.2s;
+        }
+
+        input:focus {
+            outline: none;
+            border-color: var(--accent);
+        }
+
+        button {
+            background-color: var(--accent);
+            color: white;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 4px;
+            font-size: 1rem;
+            cursor: pointer;
+            font-weight: 600;
+            transition: background-color 0.2s, transform 0.1s;
+            width: 100%;
+        }
+
+        button:hover {
+            background-color: #0052cc;
+        }
+        
+        button:active {
+            transform: translateY(1px);
+        }
+
+        button.btn-danger {
+            background-color: var(--error);
+        }
+        
+        button.btn-danger:hover {
+            background-color: #c82333;
+        }
+
+        button.btn-outline {
+            background-color: transparent;
+            color: var(--text);
+            border: 1px solid var(--border);
+        }
+
+        button.btn-outline:hover {
+            background-color: var(--bg);
+        }
+
+        .settings-panel {
+            background: #e9ecef;
+            padding: 1rem 2rem;
+            border-bottom: 1px solid var(--border);
+            display: none;
+        }
+
+        .settings-panel.active {
+            display: block;
+        }
+
+        .settings-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        /* Active Session Display */
+        .session-display {
+            text-align: center;
+            padding: 2rem;
+            background: #f8faff;
+            border: 2px dashed var(--accent);
+            border-radius: 8px;
+            margin-top: 1.5rem;
+            display: none;
+        }
+
+        .session-display.active {
+            display: block;
+            animation: fadeIn 0.5s;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .code-display {
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 4rem;
+            letter-spacing: 1rem;
+            font-weight: bold;
+            color: var(--primary);
+            margin: 1rem 0;
+            background: white;
+            padding: 1rem;
+            border-radius: 8px;
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .timer-container {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            font-size: 1.25rem;
+            color: var(--warning);
+            font-weight: bold;
+        }
+
+        /* Table Styles */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 1rem;
+        }
+
+        th, td {
+            padding: 1rem;
+            text-align: left;
+            border-bottom: 1px solid var(--border);
+        }
+
+        th {
+            background-color: var(--bg);
+            font-weight: 600;
+            color: #555;
+        }
+
+        tr:hover {
+            background-color: #f8f9fa;
+        }
+
+        /* Status Dots */
+        .status-dot {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-right: 0.5rem;
+        }
+
+        .status-created { background-color: var(--info); }
+        .status-active { background-color: var(--success); }
+        .status-verified { background-color: #6f42c1; }
+        .status-expired { background-color: #6c757d; }
+        .status-ended { background-color: var(--error); }
+
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 0.25rem 0.5rem;
+            border-radius: 1rem;
+            font-size: 0.85rem;
+            background: var(--bg);
+            border: 1px solid var(--border);
+        }
+
+        /* Toasts */
+        #toast-container {
+            position: fixed;
+            bottom: 2rem;
+            right: 2rem;
+            z-index: 1000;
+        }
+
+        .toast {
+            background: white;
+            border-left: 4px solid var(--accent);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            padding: 1rem 1.5rem;
+            margin-top: 1rem;
+            border-radius: 4px;
+            min-width: 300px;
+            animation: slideIn 0.3s forwards;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .toast.error { border-left-color: var(--error); }
+        .toast.success { border-left-color: var(--success); }
+
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+
+        @media (max-width: 768px) {
+            .main-container {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div style="background-color: var(--error); color: white; padding: 10px; text-align: center; font-weight: bold;">
+        ⚠️ DEMO ONLY — API keys are stored in your browser for convenience. In production, keys must NEVER be sent to a browser.
+    </div>
+
+    <header>
+        <div class="header-title">
+            <h2>Demo Bank</h2>
+            <span class="badge">Ringseal Console</span>
+        </div>
+        <button class="btn-outline" style="width: auto; padding: 0.5rem 1rem; color: white; border-color: rgba(255,255,255,0.3);" onclick="toggleSettings()">⚙️ Settings</button>
+    </header>
+
+    <div class="settings-panel" id="settingsPanel">
+        <div style="margin-bottom: 1rem; color: var(--text);">Note: Tenant management API is available internally on port 9090.</div>
+        <div class="settings-grid">
+            <div class="form-group">
+                <label>API Base URL</label>
+                <input type="url" id="apiUrl" value="http://localhost:8080">
+            </div>
+            <div class="form-group">
+                <label>API Key</label>
+                <input type="password" id="apiKey" placeholder="Enter X-API-Key">
+            </div>
+        </div>
+        <button style="width: auto; margin-top: 1rem;" onclick="saveConfig()">Save Configuration</button>
+    </div>
+
+    <div class="main-container">
+        <!-- Create Session Area -->
+        <div class="card">
+            <h3 class="card-title">Start Verification Session</h3>
+            <div class="form-group">
+                <label>Customer Reference</label>
+                <input type="text" id="customerRef" placeholder="e.g., cust_12345">
+            </div>
+            <div class="form-group">
+                <label>Agent Reference</label>
+                <input type="text" id="agentRef" placeholder="e.g., agent_789" value="demo_agent">
+            </div>
+            <button id="btnCreateSession" onclick="createSession()">Generate Security Code</button>
+
+            <div class="session-display" id="currentSessionDisplay">
+                <p>Provide this code to the customer:</p>
+                <div class="code-display" id="displayCode">------</div>
+                <div class="timer-container">
+                    <span>⏱️</span>
+                    <span id="displayTimer">--:--</span>
+                </div>
+                <p style="margin-top: 1rem; font-size: 0.85rem; color: #666;">Session ID: <span id="displaySessionId"></span></p>
+                <button class="btn-danger" style="margin-top: 1rem;" onclick="endCurrentSession()">End Session</button>
+            </div>
+        </div>
+
+        <!-- Active Sessions Area -->
+        <div class="card" style="overflow-x: auto;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <h3 class="card-title" style="margin-bottom: 0; border: none;">Recent Sessions</h3>
+                <button class="btn-outline" style="width: auto; padding: 0.25rem 0.75rem; font-size: 0.85rem;" onclick="fetchSessions()">🔄 Refresh</button>
+            </div>
+            <table id="sessionsTable">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Customer Ref</th>
+                        <th>Status</th>
+                        <th>Created</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody id="sessionsList">
+                    <tr><td colspan="5" style="text-align: center; color: #777;">Loading...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div id="toast-container"></div>
+
+    <script>
+        // Configuration
+        const config = {
+            apiUrl: localStorage.getItem('ringseal_api_url') || 'http://localhost:8080',
+            apiKey: localStorage.getItem('ringseal_api_key') || ''
+        };
+
+        // State
+        let currentSessionId = null;
+        let countdownInterval = null;
+        let pollInterval = null;
+
+        // Initialize
+        document.getElementById('apiUrl').value = config.apiUrl;
+        document.getElementById('apiKey').value = config.apiKey;
+
+        function toggleSettings() {
+            document.getElementById('settingsPanel').classList.toggle('active');
+        }
+
+        function saveConfig() {
+            config.apiUrl = document.getElementById('apiUrl').value;
+            config.apiKey = document.getElementById('apiKey').value;
+            localStorage.setItem('ringseal_api_url', config.apiUrl);
+            localStorage.setItem('ringseal_api_key', config.apiKey);
+            showToast('Configuration saved successfully!', 'success');
+            toggleSettings();
+            fetchSessions();
+        }
+
+        function showToast(message, type = 'info') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            toast.innerHTML = `<span>${message}</span>`;
+            container.appendChild(toast);
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+
+        function getHeaders() {
+            return {
+                'Content-Type': 'application/json',
+                'X-API-Key': config.apiKey
+            };
+        }
+
+        async function createSession() {
+            const customerRef = document.getElementById('customerRef').value;
+            const agentRef = document.getElementById('agentRef').value;
+
+            if (!customerRef) {
+                showToast('Customer Reference is required', 'error');
+                return;
+            }
+
+            const btn = document.getElementById('btnCreateSession');
+            btn.disabled = true;
+            btn.innerText = 'Generating...';
+
+            try {
+                const response = await fetch(`${config.apiUrl}/api/v1/sessions`, {
+                    method: 'POST',
+                    headers: getHeaders(),
+                    body: JSON.stringify({
+                        customer_ref: customerRef,
+                        agent_ref: agentRef
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`API Error: ${response.status} ${await response.text()}`);
+                }
+
+                const data = await response.json();
+                
+                showToast('Session created successfully', 'success');
+                displaySession(data);
+                fetchSessions();
+            } catch (err) {
+                showToast(err.message, 'error');
+            } finally {
+                btn.disabled = false;
+                btn.innerText = 'Generate Security Code';
+            }
+        }
+
+        function displaySession(session) {
+            document.getElementById('currentSessionDisplay').classList.add('active');
+            document.getElementById('displayCode').innerText = session.code || '------';
+            document.getElementById('displaySessionId').innerText = session.id;
+            currentSessionId = session.id;
+
+            if (countdownInterval) clearInterval(countdownInterval);
+            
+            const expiresAt = new Date(session.expires_at).getTime();
+            
+            countdownInterval = setInterval(() => {
+                const now = new Date().getTime();
+                const distance = expiresAt - now;
+
+                if (distance < 0) {
+                    clearInterval(countdownInterval);
+                    document.getElementById('displayTimer').innerText = "Expired";
+                    document.getElementById('displayTimer').style.color = "var(--error)";
+                    return;
+                }
+
+                const minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
+                const seconds = Math.floor((distance % (1000 * 60)) / 1000);
+                document.getElementById('displayTimer').innerText = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+                document.getElementById('displayTimer').style.color = "var(--warning)";
+            }, 1000);
+        }
+
+        async function endCurrentSession() {
+            if (!currentSessionId) return;
+            await updateSessionStatus(currentSessionId, 'ended');
+            document.getElementById('currentSessionDisplay').classList.remove('active');
+            clearInterval(countdownInterval);
+            currentSessionId = null;
+        }
+
+        async function updateSessionStatus(id, status) {
+            try {
+                const response = await fetch(`${config.apiUrl}/api/v1/sessions/${id}`, {
+                    method: 'PUT',
+                    headers: getHeaders(),
+                    body: JSON.stringify({ status })
+                });
+
+                if (!response.ok) throw new Error('Failed to update session');
+                
+                showToast(`Session ${status}`, 'success');
+                fetchSessions();
+            } catch (err) {
+                showToast(err.message, 'error');
+            }
+        }
+
+        async function fetchSessions() {
+            if (!config.apiKey) return;
+            
+            try {
+                // Fetch recent sessions - assuming GET /api/v1/sessions exists, otherwise this is mocked
+                const response = await fetch(`${config.apiUrl}/api/v1/sessions?limit=10`, {
+                    headers: getHeaders()
+                });
+
+                if (!response.ok) {
+                    // If endpoint doesn't exist yet, we'll just ignore for demo gracefully
+                    console.warn('Failed to fetch sessions or endpoint not implemented');
+                    return;
+                }
+
+                const data = await response.json();
+                const tbody = document.getElementById('sessionsList');
+                tbody.innerHTML = '';
+
+                if (!data.items || data.items.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="5" style="text-align: center;">No recent sessions found</td></tr>';
+                    return;
+                }
+
+                data.items.forEach(s => {
+                    const tr = document.createElement('tr');
+                    
+                    const time = new Date(s.created_at).toLocaleTimeString();
+                    
+                    let statusLabel = s.status;
+                    let actionBtn = '';
+                    if (s.status === 'created' || s.status === 'active') {
+                        actionBtn = `<button class="btn-danger" style="padding: 0.25rem 0.5rem; font-size: 0.8rem; width: auto;" onclick="updateSessionStatus('${s.id}', 'ended')">End</button>`;
+                    }
+
+                    tr.innerHTML = `
+                        <td style="font-family: monospace; font-size: 0.85rem;">${s.id.substring(0,8)}...</td>
+                        <td>${s.customer_ref}</td>
+                        <td>
+                            <div class="status-badge">
+                                <span class="status-dot status-${s.status.toLowerCase()}"></span>
+                                ${s.status}
+                            </div>
+                        </td>
+                        <td>${time}</td>
+                        <td>${actionBtn}</td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+
+            } catch (err) {
+                console.error(err);
+            }
+        }
+
+        // Start polling
+        if (config.apiKey) {
+            fetchSessions();
+            pollInterval = setInterval(fetchSessions, 5000);
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,56 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    # F-03: Do NOT publish port to host — only accessible within Docker network
+    # ports:
+    #   - "5432:5432"
+    environment:
+      POSTGRES_USER: ringseal
+      POSTGRES_PASSWORD_FILE: /run/secrets/db_password
+      POSTGRES_DB: ringseal
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    secrets:
+      - db_password
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ringseal"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - ringseal-net
+
+  ringseal:
+    build: .
+    ports:
+      - "8080:8080"     # Public API
+      # Internal API (9090) NOT published — only accessible within Docker network
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://ringseal:${DB_PASSWORD}@postgres:5432/ringseal?sslmode=prefer
+      HOST: 0.0.0.0
+      PORT: 8080
+      INTERNAL_PORT: 9090
+      MASTER_SECRET: ${MASTER_SECRET}
+      ADMIN_SECRET: ${ADMIN_SECRET}
+      TRUSTED_PROXY_COUNT: 0
+      MAX_JWT_LIFETIME_SECONDS: 300
+      WEBHOOK_REQUIRE_HTTPS: true
+      RUST_LOG: ringseal=info,tower_http=info
+    networks:
+      - ringseal-net
+
+secrets:
+  db_password:
+    file: ./secrets/db_password.txt
+
+volumes:
+  pgdata:
+
+networks:
+  ringseal-net:
+    driver: bridge
