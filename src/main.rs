@@ -10,23 +10,20 @@ pub mod rate_limit;
 pub mod webhooks;
 
 use axum::{
+    extract::Request,
+    http::StatusCode,
     middleware::{self, Next},
     response::Response,
-    extract::Request,
 };
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::net::TcpListener;
+use tower_http::cors::{Any, CorsLayer};
+use tower_http::timeout::TimeoutLayer;
 use tower_http::trace::TraceLayer;
-use tower_http::cors::{CorsLayer, Any};
-use tower::timeout::TimeoutLayer;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
-use crate::{
-    config::AppConfig,
-    db::Database,
-    rate_limit::RateLimiter,
-};
+use crate::{config::AppConfig, db::Database, rate_limit::RateLimiter};
 
 /// Shared application state, passed to all handlers via Arc.
 pub struct AppState {
@@ -87,7 +84,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .layer(middleware::from_fn(security_headers_middleware))
         .layer(cors)
         .layer(TraceLayer::new_for_http())
-        .layer(TimeoutLayer::new(Duration::from_secs(30)))
+        .layer(TimeoutLayer::with_status_code(
+            StatusCode::REQUEST_TIMEOUT,
+            Duration::from_secs(30),
+        ))
         .with_state(state.clone());
 
     // F-04: Internal API on a separate listener (127.0.0.1 only)

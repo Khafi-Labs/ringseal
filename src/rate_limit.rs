@@ -42,10 +42,10 @@ impl SlidingWindow {
 
         let now = Instant::now();
         let elapsed = now.duration_since(self.window_start);
-        
+
         let elapsed_fraction = elapsed.as_secs_f64() / self.window_duration.as_secs_f64();
         let weight = (1.0 - elapsed_fraction).max(0.0);
-        
+
         let estimated_prev = (self.prev_count as f64 * weight) as u64;
         let effective_count = estimated_prev + self.curr_count;
 
@@ -69,11 +69,21 @@ impl RateLimiter {
         }
     }
 
-    pub fn check_rate_limit(&self, key: &str, max_requests: u64, window_seconds: u64) -> Result<(), AppError> {
-        let mut limits = self.limits.lock().map_err(|_| AppError::Internal("Rate limiter lock poisoned".into()))?;
-        
-        let window = limits.entry(key.to_string()).or_insert_with(|| SlidingWindow::new(Duration::from_secs(window_seconds)));
-        
+    pub fn check_rate_limit(
+        &self,
+        key: &str,
+        max_requests: u64,
+        window_seconds: u64,
+    ) -> Result<(), AppError> {
+        let mut limits = self
+            .limits
+            .lock()
+            .map_err(|_| AppError::Internal("Rate limiter lock poisoned".into()))?;
+
+        let window = limits
+            .entry(key.to_string())
+            .or_insert_with(|| SlidingWindow::new(Duration::from_secs(window_seconds)));
+
         if window.window_duration != Duration::from_secs(window_seconds) {
             window.window_duration = Duration::from_secs(window_seconds);
         }
@@ -81,11 +91,16 @@ impl RateLimiter {
         if !window.check_and_add(max_requests) {
             return Err(AppError::RateLimited);
         }
-        
+
         Ok(())
     }
 
-    pub fn check_ip_rate_limit(&self, ip: &str, max_requests: u64, window_seconds: u64) -> Result<(), AppError> {
+    pub fn check_ip_rate_limit(
+        &self,
+        ip: &str,
+        max_requests: u64,
+        window_seconds: u64,
+    ) -> Result<(), AppError> {
         let key = format!("ip:{}", ip);
         self.check_rate_limit(&key, max_requests, window_seconds)
     }
@@ -94,9 +109,7 @@ impl RateLimiter {
         if let Ok(mut limits) = self.limits.lock() {
             let now = Instant::now();
             let duration = Duration::from_secs(window_seconds);
-            limits.retain(|_, window| {
-                now.duration_since(window.window_start) <= duration * 2
-            });
+            limits.retain(|_, window| now.duration_since(window.window_start) <= duration * 2);
         }
     }
 }

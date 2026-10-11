@@ -10,8 +10,8 @@ use uuid::Uuid;
 use crate::{
     code_gen::hash_secret,
     errors::AppError,
-    AppState,
     models::{Tenant, TenantApiKey},
+    AppState,
 };
 
 pub struct TenantAuth {
@@ -22,7 +22,10 @@ pub struct TenantAuth {
 impl FromRequestParts<Arc<AppState>> for TenantAuth {
     type Rejection = AppError;
 
-    async fn from_request_parts(parts: &mut Parts, state: &Arc<AppState>) -> Result<Self, Self::Rejection> {
+    async fn from_request_parts(
+        parts: &mut Parts,
+        state: &Arc<AppState>,
+    ) -> Result<Self, Self::Rejection> {
         let app_state = state;
         let headers = &parts.headers;
 
@@ -41,7 +44,9 @@ impl FromRequestParts<Arc<AppState>> for TenantAuth {
             .ok_or_else(|| AppError::Unauthorized("Invalid API key".into()))?;
 
         if !tenant.active || !api_key.active {
-            return Err(AppError::Unauthorized("API key or tenant is inactive".into()));
+            return Err(AppError::Unauthorized(
+                "API key or tenant is inactive".into(),
+            ));
         }
 
         if let Some(expires_at) = api_key.expires_at {
@@ -84,7 +89,10 @@ pub struct CustomerAuth(pub Claims);
 impl FromRequestParts<Arc<AppState>> for CustomerAuth {
     type Rejection = AppError;
 
-    async fn from_request_parts(parts: &mut Parts, state: &Arc<AppState>) -> Result<Self, Self::Rejection> {
+    async fn from_request_parts(
+        parts: &mut Parts,
+        state: &Arc<AppState>,
+    ) -> Result<Self, Self::Rejection> {
         let app_state = state;
         let headers = &parts.headers;
 
@@ -94,7 +102,9 @@ impl FromRequestParts<Arc<AppState>> for CustomerAuth {
             .ok_or_else(|| AppError::Unauthorized("Missing Authorization header".into()))?;
 
         if !auth_header.starts_with("Bearer ") {
-            return Err(AppError::Unauthorized("Invalid Authorization header format".into()));
+            return Err(AppError::Unauthorized(
+                "Invalid Authorization header format".into(),
+            ));
         }
 
         let token = &auth_header[7..];
@@ -127,7 +137,8 @@ impl FromRequestParts<Arc<AppState>> for CustomerAuth {
         }
 
         let mut normalized_claims = claims;
-        normalized_claims.customer_ref = crate::models::normalize_ref(&normalized_claims.customer_ref);
+        normalized_claims.customer_ref =
+            crate::models::normalize_ref(&normalized_claims.customer_ref);
 
         Ok(CustomerAuth(normalized_claims))
     }

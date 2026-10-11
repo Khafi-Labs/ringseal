@@ -58,11 +58,7 @@ impl IntoResponse for AppError {
                 "MAX_ATTEMPTS_EXCEEDED",
                 "Maximum attempts exceeded".to_string(),
             ),
-            AppError::JsonRejection(m) => (
-                StatusCode::BAD_REQUEST,
-                "BAD_REQUEST",
-                m.clone(),
-            ),
+            AppError::JsonRejection(m) => (StatusCode::BAD_REQUEST, "BAD_REQUEST", m.clone()),
             AppError::Internal(m) => (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 "INTERNAL_ERROR",

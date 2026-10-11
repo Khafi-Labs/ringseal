@@ -1,10 +1,10 @@
+use crate::errors::AppError;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
-use uuid::Uuid;
 use std::fmt;
 use std::str::FromStr;
-use crate::errors::AppError;
+use uuid::Uuid;
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 #[serde(rename_all = "snake_case")]

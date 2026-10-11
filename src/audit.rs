@@ -1,8 +1,4 @@
-use crate::{
-    db::Database,
-    errors::AppError,
-    models::AuditEntry,
-};
+use crate::{db::Database, errors::AppError, models::AuditEntry};
 use sha2::{Digest, Sha256};
 use uuid::Uuid;
 
@@ -17,7 +13,10 @@ pub async fn log_action(
     user_agent: Option<&str>,
     details: Option<serde_json::Value>,
 ) -> Result<(), AppError> {
-    let latest_hash = db.get_latest_audit_hash(tenant_id).await.map_err(AppError::Database)?;
+    let latest_hash = db
+        .get_latest_audit_hash(tenant_id)
+        .await
+        .map_err(AppError::Database)?;
 
     let now = chrono::Utc::now();
     let entry_id = Uuid::new_v4();

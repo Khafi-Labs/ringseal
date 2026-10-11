@@ -1,5 +1,5 @@
 use chrono::{DateTime, Utc};
-use sha2::{Sha256, Digest};
+use sha2::{Digest, Sha256};
 use sqlx::{postgres::PgPoolOptions, PgPool};
 use uuid::Uuid;
 
@@ -85,20 +85,24 @@ impl Database {
         )
         .execute(&self.pool)
         .await?;
-        
+
         Ok(())
     }
 
-    pub async fn create_tenant(&self, name: &str, webhook_url: Option<&str>) -> Result<Tenant, sqlx::Error> {
+    pub async fn create_tenant(
+        &self,
+        name: &str,
+        webhook_url: Option<&str>,
+    ) -> Result<Tenant, sqlx::Error> {
         let id = Uuid::new_v4();
         let created_at = Utc::now();
-        
+
         sqlx::query_as::<_, Tenant>(
             r#"
             INSERT INTO tenants (id, name, webhook_url, active, created_at)
             VALUES ($1, $2, $3, true, $4)
             RETURNING id, name, webhook_url, active, created_at
-            "#
+            "#,
         )
         .bind(id)
         .bind(name)
@@ -126,7 +130,7 @@ impl Database {
     ) -> Result<TenantApiKey, sqlx::Error> {
         let id = Uuid::new_v4();
         let created_at = Utc::now();
-        
+
         sqlx::query_as::<_, TenantApiKey>(
             r#"
             INSERT INTO tenant_api_keys (id, tenant_id, key_hash, label, scopes, expires_at, ip_allowlist, active, created_at)
@@ -146,19 +150,23 @@ impl Database {
         .await
     }
 
-    pub async fn get_api_key_by_hash(&self, hash: &str) -> Result<Option<(Tenant, TenantApiKey)>, sqlx::Error> {
-        let key = sqlx::query_as::<_, TenantApiKey>("SELECT * FROM tenant_api_keys WHERE key_hash = $1")
-            .bind(hash)
-            .fetch_optional(&self.pool)
-            .await?;
-            
+    pub async fn get_api_key_by_hash(
+        &self,
+        hash: &str,
+    ) -> Result<Option<(Tenant, TenantApiKey)>, sqlx::Error> {
+        let key =
+            sqlx::query_as::<_, TenantApiKey>("SELECT * FROM tenant_api_keys WHERE key_hash = $1")
+                .bind(hash)
+                .fetch_optional(&self.pool)
+                .await?;
+
         if let Some(k) = key {
             let tenant = self.get_tenant_by_id(k.tenant_id).await?;
             if let Some(t) = tenant {
                 return Ok(Some((t, k)));
             }
         }
-        
+
         Ok(None)
     }
 
@@ -168,7 +176,7 @@ impl Database {
             .bind(tenant_id)
             .execute(&self.pool)
             .await?;
-            
+
         Ok(res.rows_affected() > 0)
     }
 
@@ -182,10 +190,12 @@ impl Database {
     }
 
     pub async fn list_api_keys(&self, tenant_id: Uuid) -> Result<Vec<TenantApiKey>, sqlx::Error> {
-        sqlx::query_as::<_, TenantApiKey>("SELECT * FROM tenant_api_keys WHERE tenant_id = $1 ORDER BY created_at DESC")
-            .bind(tenant_id)
-            .fetch_all(&self.pool)
-            .await
+        sqlx::query_as::<_, TenantApiKey>(
+            "SELECT * FROM tenant_api_keys WHERE tenant_id = $1 ORDER BY created_at DESC",
+        )
+        .bind(tenant_id)
+        .fetch_all(&self.pool)
+        .await
     }
 
     pub async fn create_session(
@@ -199,7 +209,7 @@ impl Database {
     ) -> Result<Session, sqlx::Error> {
         let id = Uuid::new_v4();
         let created_at = Utc::now();
-        
+
         sqlx::query_as::<_, Session>(
             r#"
             INSERT INTO sessions (id, tenant_id, customer_ref, agent_ref, status, code_encrypted, code_expires_at, attempts, max_attempts, created_at)
@@ -226,7 +236,11 @@ impl Database {
             .await
     }
 
-    pub async fn get_active_session_for_customer(&self, tenant_id: Uuid, customer_ref: &str) -> Result<Option<Session>, sqlx::Error> {
+    pub async fn get_active_session_for_customer(
+        &self,
+        tenant_id: Uuid,
+        customer_ref: &str,
+    ) -> Result<Option<Session>, sqlx::Error> {
         sqlx::query_as::<_, Session>(
             "SELECT * FROM sessions WHERE tenant_id = $1 AND customer_ref = $2 AND status IN ('created', 'active') LIMIT 1"
         )
@@ -236,7 +250,11 @@ impl Database {
         .await
     }
 
-    pub async fn update_session_status(&self, id: Uuid, status: SessionStatus) -> Result<(), sqlx::Error> {
+    pub async fn update_session_status(
+        &self,
+        id: Uuid,
+        status: SessionStatus,
+    ) -> Result<(), sqlx::Error> {
         let status_str = status.to_string();
         sqlx::query("UPDATE sessions SET status = $1 WHERE id = $2")
             .bind(status_str)
@@ -248,12 +266,12 @@ impl Database {
 
     pub async fn increment_session_attempts(&self, id: Uuid) -> Result<i32, sqlx::Error> {
         let (attempts,): (i32,) = sqlx::query_as(
-            "UPDATE sessions SET attempts = attempts + 1 WHERE id = $1 RETURNING attempts"
+            "UPDATE sessions SET attempts = attempts + 1 WHERE id = $1 RETURNING attempts",
         )
         .bind(id)
         .fetch_one(&self.pool)
         .await?;
-        
+
         Ok(attempts)
     }
 
@@ -273,11 +291,16 @@ impl Database {
         )
         .execute(&self.pool)
         .await?;
-        
+
         Ok(res.rows_affected())
     }
 
-    pub async fn count_recent_sessions_for_customer(&self, tenant_id: Uuid, customer_ref: &str, window_seconds: i64) -> Result<i64, sqlx::Error> {
+    pub async fn count_recent_sessions_for_customer(
+        &self,
+        tenant_id: Uuid,
+        customer_ref: &str,
+        window_seconds: i64,
+    ) -> Result<i64, sqlx::Error> {
         let (count,): (i64,) = sqlx::query_as(
             "SELECT COUNT(*) FROM sessions WHERE tenant_id = $1 AND customer_ref = $2 AND created_at > NOW() - interval '1 second' * $3"
         )
@@ -286,7 +309,7 @@ impl Database {
         .bind(window_seconds as f64)
         .fetch_one(&self.pool)
         .await?;
-        
+
         Ok(count)
     }
 
@@ -313,7 +336,10 @@ impl Database {
         Ok(())
     }
 
-    pub async fn get_latest_audit_hash(&self, tenant_id: Uuid) -> Result<Option<String>, sqlx::Error> {
+    pub async fn get_latest_audit_hash(
+        &self,
+        tenant_id: Uuid,
+    ) -> Result<Option<String>, sqlx::Error> {
         #[derive(sqlx::FromRow)]
         struct LatestAudit {
             id: Uuid,
@@ -323,19 +349,24 @@ impl Database {
             created_at: DateTime<Utc>,
             prev_hash: Option<String>,
         }
-        
+
         let latest = sqlx::query_as::<_, LatestAudit>(
             "SELECT id, tenant_id, action, actor, created_at, prev_hash FROM audit_log WHERE tenant_id = $1 ORDER BY created_at DESC LIMIT 1"
         )
         .bind(tenant_id)
         .fetch_optional(&self.pool)
         .await?;
-        
+
         if let Some(l) = latest {
             let mut hasher = Sha256::new();
             let data = format!(
                 "{}:{}:{}:{}:{}:{}",
-                l.id, l.tenant_id, l.action, l.actor, l.created_at.timestamp(), l.prev_hash.unwrap_or_default()
+                l.id,
+                l.tenant_id,
+                l.action,
+                l.actor,
+                l.created_at.timestamp(),
+                l.prev_hash.unwrap_or_default()
             );
             hasher.update(data.as_bytes());
             Ok(Some(hex::encode(hasher.finalize())))
@@ -344,7 +375,12 @@ impl Database {
         }
     }
 
-    pub async fn get_audit_log(&self, tenant_id: Uuid, session_id: Option<Uuid>, limit: i64) -> Result<Vec<AuditEntry>, sqlx::Error> {
+    pub async fn get_audit_log(
+        &self,
+        tenant_id: Uuid,
+        session_id: Option<Uuid>,
+        limit: i64,
+    ) -> Result<Vec<AuditEntry>, sqlx::Error> {
         if let Some(sid) = session_id {
             sqlx::query_as::<_, AuditEntry>("SELECT * FROM audit_log WHERE tenant_id = $1 AND session_id = $2 ORDER BY created_at DESC LIMIT $3")
                 .bind(tenant_id)
@@ -353,11 +389,13 @@ impl Database {
                 .fetch_all(&self.pool)
                 .await
         } else {
-            sqlx::query_as::<_, AuditEntry>("SELECT * FROM audit_log WHERE tenant_id = $1 ORDER BY created_at DESC LIMIT $2")
-                .bind(tenant_id)
-                .bind(limit)
-                .fetch_all(&self.pool)
-                .await
+            sqlx::query_as::<_, AuditEntry>(
+                "SELECT * FROM audit_log WHERE tenant_id = $1 ORDER BY created_at DESC LIMIT $2",
+            )
+            .bind(tenant_id)
+            .bind(limit)
+            .fetch_all(&self.pool)
+            .await
         }
     }
 }

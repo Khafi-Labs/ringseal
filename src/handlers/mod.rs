@@ -1,6 +1,9 @@
-use axum::{routing::{get, post}, Router};
-use std::sync::Arc;
 use crate::AppState;
+use axum::{
+    routing::{get, post},
+    Router,
+};
+use std::sync::Arc;
 
 pub mod health;
 pub mod sessions;
@@ -20,8 +23,17 @@ pub fn public_router() -> Router<Arc<AppState>> {
 pub fn internal_router() -> Router<Arc<AppState>> {
     Router::new()
         .route("/internal/v1/tenants", post(tenants::create))
-        .route("/internal/v1/tenants/{tenant_id}/keys", post(tenants::create_api_key))
-        .route("/internal/v1/tenants/{tenant_id}/keys", get(tenants::list_api_keys))
-        .route("/internal/v1/tenants/{tenant_id}/keys/{key_id}/revoke", post(tenants::revoke_api_key))
+        .route(
+            "/internal/v1/tenants/{tenant_id}/keys",
+            post(tenants::create_api_key),
+        )
+        .route(
+            "/internal/v1/tenants/{tenant_id}/keys",
+            get(tenants::list_api_keys),
+        )
+        .route(
+            "/internal/v1/tenants/{tenant_id}/keys/{key_id}/revoke",
+            post(tenants::revoke_api_key),
+        )
         .route("/internal/v1/health", get(health::check))
 }

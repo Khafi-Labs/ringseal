@@ -1,6 +1,6 @@
+use crate::models::HealthResponse;
 use axum::Json;
 use chrono::Utc;
-use crate::models::HealthResponse;
 
 pub async fn check() -> Json<HealthResponse> {
     Json(HealthResponse {

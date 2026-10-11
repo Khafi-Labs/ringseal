@@ -1,21 +1,22 @@
 use axum::{
-    extract::{Path, State, Query},
+    extract::{Path, Query, State},
     http::HeaderMap,
     Json,
 };
+use chrono::Utc;
 use std::sync::Arc;
 use uuid::Uuid;
-use chrono::Utc;
 
 use crate::{
     audit::log_action,
     auth::{extract_client_ip, extract_user_agent, has_scope, TenantAuth},
     code_gen::{encrypt_code, generate_code},
     errors::AppError,
-    AppState,
     models::{
-        ActiveSessionQuery, CreateSessionRequest, CreateSessionResponse, SessionResponse, SessionStatus, normalize_ref
+        normalize_ref, ActiveSessionQuery, CreateSessionRequest, CreateSessionResponse,
+        SessionResponse, SessionStatus,
     },
+    AppState,
 };
 
 pub async fn create(
@@ -31,28 +32,42 @@ pub async fn create(
     let customer_ref = normalize_ref(&payload.customer_ref);
     let agent_ref = normalize_ref(&payload.agent_ref);
 
-    let recent_count = state.db.count_recent_sessions_for_customer(
-        auth.tenant.id, 
-        &customer_ref, 
-        state.config.max_sessions_window_seconds
-    ).await.map_err(AppError::Database)?;
+    let recent_count = state
+        .db
+        .count_recent_sessions_for_customer(
+            auth.tenant.id,
+            &customer_ref,
+            state.config.max_sessions_window_seconds,
+        )
+        .await
+        .map_err(AppError::Database)?;
 
     if recent_count >= state.config.max_sessions_per_customer as i64 {
-        return Err(AppError::BadRequest("Max sessions per customer exceeded".into()));
+        return Err(AppError::BadRequest(
+            "Max sessions per customer exceeded".into(),
+        ));
     }
 
     let code = generate_code();
-    let encrypted = encrypt_code(&code, state.config.master_secret.as_bytes(), &auth.tenant.id);
+    let encrypted = encrypt_code(
+        &code,
+        state.config.master_secret.as_bytes(),
+        &auth.tenant.id,
+    );
     let expires_at = Utc::now() + chrono::Duration::seconds(state.config.code_expiry_seconds);
 
-    let session = state.db.create_session(
-        auth.tenant.id,
-        &customer_ref,
-        &agent_ref,
-        encrypted,
-        expires_at,
-        state.config.max_attempts,
-    ).await.map_err(AppError::Database)?;
+    let session = state
+        .db
+        .create_session(
+            auth.tenant.id,
+            &customer_ref,
+            &agent_ref,
+            encrypted,
+            expires_at,
+            state.config.max_attempts,
+        )
+        .await
+        .map_err(AppError::Database)?;
 
     let ip = extract_client_ip(&headers, state.config.trusted_proxy_count);
     let ua = extract_user_agent(&headers);
@@ -68,7 +83,8 @@ pub async fn create(
         &ip,
         ua.as_deref(),
         None,
-    ).await?;
+    )
+    .await?;
 
     Ok(Json(CreateSessionResponse {
         session_id: session.id,
@@ -87,7 +103,11 @@ pub async fn get(
         return Err(AppError::Forbidden("Missing 'read' scope".into()));
     }
 
-    let session = state.db.get_session(id).await.map_err(AppError::Database)?
+    let session = state
+        .db
+        .get_session(id)
+        .await
+        .map_err(AppError::Database)?
         .ok_or_else(|| AppError::NotFound("Session not found".into()))?;
 
     if session.tenant_id != auth.tenant.id {
@@ -108,7 +128,8 @@ pub async fn get(
         &ip,
         ua.as_deref(),
         None,
-    ).await?;
+    )
+    .await?;
 
     Ok(Json(SessionResponse {
         id: session.id,
@@ -133,7 +154,9 @@ pub async fn get_active(
 
     let customer_ref = normalize_ref(&query.customer_ref);
 
-    let session = state.db.get_active_session_for_customer(auth.tenant.id, &customer_ref)
+    let session = state
+        .db
+        .get_active_session_for_customer(auth.tenant.id, &customer_ref)
         .await
         .map_err(AppError::Database)?
         .ok_or_else(|| AppError::NotFound("Active session not found".into()))?;
@@ -152,7 +175,8 @@ pub async fn get_active(
         &ip,
         ua.as_deref(),
         None,
-    ).await?;
+    )
+    .await?;
 
     Ok(Json(SessionResponse {
         id: session.id,
@@ -175,7 +199,11 @@ pub async fn end(
         return Err(AppError::Forbidden("Missing 'end' scope".into()));
     }
 
-    let session = state.db.get_session(id).await.map_err(AppError::Database)?
+    let session = state
+        .db
+        .get_session(id)
+        .await
+        .map_err(AppError::Database)?
         .ok_or_else(|| AppError::NotFound("Session not found".into()))?;
 
     if session.tenant_id != auth.tenant.id {
@@ -198,7 +226,8 @@ pub async fn end(
         &ip,
         ua.as_deref(),
         None,
-    ).await?;
+    )
+    .await?;
 
     Ok(Json(()))
 }

@@ -1,19 +1,15 @@
-use axum::{
-    extract::State,
-    http::HeaderMap,
-    Json,
-};
-use std::sync::Arc;
+use axum::{extract::State, http::HeaderMap, Json};
 use chrono::Utc;
+use std::sync::Arc;
 
 use crate::{
     audit::log_action,
     auth::{extract_client_ip, extract_user_agent, CustomerAuth},
     code_gen::decrypt_code,
     errors::AppError,
-    AppState,
     models::{SessionStatus, VerifySessionResponse, WebhookPayload},
     webhooks::spawn_webhook,
+    AppState,
 };
 
 pub async fn get_active_session(
@@ -23,12 +19,16 @@ pub async fn get_active_session(
 ) -> Result<Json<VerifySessionResponse>, AppError> {
     let claims = auth.0;
 
-    let session = state.db.get_active_session_for_customer(claims.tenant_id, &claims.customer_ref)
+    let session = state
+        .db
+        .get_active_session_for_customer(claims.tenant_id, &claims.customer_ref)
         .await
         .map_err(AppError::Database)?
         .ok_or_else(|| AppError::NotFound("No active session".into()))?;
 
-    let tenant = state.db.get_tenant_by_id(claims.tenant_id)
+    let tenant = state
+        .db
+        .get_tenant_by_id(claims.tenant_id)
         .await
         .map_err(AppError::Database)?
         .ok_or_else(|| AppError::NotFound("Tenant not found".into()))?;
@@ -48,7 +48,8 @@ pub async fn get_active_session(
         Some(serde_json::json!({
             "device_info": ua.clone().unwrap_or_default()
         })),
-    ).await?;
+    )
+    .await?;
 
     if let Some(webhook_url) = tenant.webhook_url {
         let payload = WebhookPayload {
@@ -65,20 +66,36 @@ pub async fn get_active_session(
         spawn_webhook(webhook_url, payload, state.config.master_secret.clone());
     }
 
-    state.db.increment_session_attempts(session.id).await.map_err(AppError::Database)?;
+    state
+        .db
+        .increment_session_attempts(session.id)
+        .await
+        .map_err(AppError::Database)?;
 
     if session.attempts >= session.max_attempts {
-        let _ = state.db.update_session_status(session.id, SessionStatus::Expired).await;
+        let _ = state
+            .db
+            .update_session_status(session.id, SessionStatus::Expired)
+            .await;
         return Err(AppError::MaxAttemptsExceeded);
     }
 
     if Utc::now() > session.code_expires_at {
-        let _ = state.db.update_session_status(session.id, SessionStatus::Expired).await;
+        let _ = state
+            .db
+            .update_session_status(session.id, SessionStatus::Expired)
+            .await;
         return Err(AppError::SessionExpired);
     }
 
-    let encrypted = session.code_encrypted.ok_or_else(|| AppError::Internal("Missing encrypted code".into()))?;
-    let code = decrypt_code(&encrypted, state.config.master_secret.as_bytes(), &claims.tenant_id)?;
+    let encrypted = session
+        .code_encrypted
+        .ok_or_else(|| AppError::Internal("Missing encrypted code".into()))?;
+    let code = decrypt_code(
+        &encrypted,
+        state.config.master_secret.as_bytes(),
+        &claims.tenant_id,
+    )?;
 
     Ok(Json(VerifySessionResponse {
         session_id: session.id,
