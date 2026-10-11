@@ -1,6 +1,6 @@
 # Security Policy
 
-Ringseal is pre-release software (v0.1) and has not had an external security audit. Known limitations are listed in [`research/03-threat-model.md`](research/03-threat-model.md).
+Ringseal is pre-release software (v1.0) and has not had an external security audit. Known limitations are listed in [`research/03-threat-model.md`](research/03-threat-model.md).
 
 ## Reporting a vulnerability
 

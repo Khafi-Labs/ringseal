@@ -1,6 +1,6 @@
 # 3. Threat model
 
-Scope: Ringseal API v0.1 as published in this repository. This is a design-level review written by the authors. It is not a third-party audit.
+Scope: Ringseal API v1.0 as published in this repository. This is a design-level review written by the authors. It is not a third-party audit.
 
 ## Assets
 
@@ -40,7 +40,7 @@ Scope: Ringseal API v0.1 as published in this repository. This is a design-level
 | F. Database reader | Codes are stored only as AES-256-GCM ciphertext, wiped on end or expiry. API keys are stored only as hashes. | A reader who also gets `MASTER_SECRET` can decrypt live codes. Keep the secret outside the database host and backups. |
 | G. Insider | Per-key scopes, IP allowlists, key expiry and audit entries with principal names. | A fully privileged bank insider can create sessions. Detection depends on reviewing the audit log. |
 
-## Known limitations (v0.1)
+## Known limitations (v1.0)
 
 These are listed openly so adopters can plan around them. Fixes are planned.
 

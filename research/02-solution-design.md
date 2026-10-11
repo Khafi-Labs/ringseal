@@ -43,7 +43,7 @@ Customer app (Ringseal SDK) --(Bearer JWT from bank)--+
 - A cap on sessions created per customer per time window.
 - A cap on how many times a session's code can be fetched (`MAX_ATTEMPTS`, default 3).
 - Configurable code expiry. `.env.example` and the sample compose file use 60 seconds.
-- A sliding-window rate limiter and its configuration exist, but v0.1 does not yet apply it to incoming requests (see limitations in the threat model).
+- A sliding-window rate limiter and its configuration exist, but v1.0 does not yet apply it to incoming requests (see limitations in the threat model).
 - Startup checks reject short or known-weak secrets.
 
 ## Auditing and webhooks

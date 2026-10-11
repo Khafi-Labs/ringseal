@@ -6,11 +6,11 @@
 
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue)](LICENSE)
 ![Rust](https://img.shields.io/badge/rust-stable-orange)
-![Status](https://img.shields.io/badge/status-v0.1%20pre--release-yellow)
+![Status](https://img.shields.io/badge/status-v1.0%20pre--release-yellow)
 
 </div>
 
-> **Status:** v0.1, pre-release, not externally audited. Read the [known limitations](research/03-threat-model.md#known-limitations-v01) before deploying to production.
+> **Status:** v1.0, pre-release, not externally audited. Read the [known limitations](research/03-threat-model.md#known-limitations-v10) before deploying to production.
 
 ## Overview
 
@@ -118,7 +118,7 @@ Full contract: [`openapi/openapi.yaml`](openapi/openapi.yaml). Guide: [`docs/int
 | Customer app | `Authorization: Bearer <JWT>`, issued by the bank |
 | Operator | `X-Admin-Secret` header, internal listener only |
 
-Customer JWTs are HS256 in v0.1, verified with `MASTER_SECRET`. Claims:
+Customer JWTs are HS256 in v1.0, verified with `MASTER_SECRET`. Claims:
 
 | Claim | Required | Notes |
 |---|---|---|
@@ -160,7 +160,7 @@ Demos: open [`demo/agent-console/index.html`](demo/agent-console/index.html) and
 
 ## Security
 
-Ringseal handles authentication material, so please read [`research/03-threat-model.md`](research/03-threat-model.md). Highlights for v0.1:
+Ringseal handles authentication material, so please read [`research/03-threat-model.md`](research/03-threat-model.md). Highlights for v1.0:
 
 - Request rate limiting is not enforced yet; put limits in a reverse proxy or gateway.
 - Customer tokens use a shared secret (HS256). Moving to Ed25519 is planned.

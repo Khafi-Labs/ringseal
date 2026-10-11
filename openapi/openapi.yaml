@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: Ringseal API
-  version: 0.1.0
+  version: 1.0.0
   description: >
     Ringseal is a multi-tenant caller-verification API for banks.
     Agents create sessions with 6-digit codes, and customers verify in their bank app.
@@ -138,7 +138,7 @@ components:
           example: "ok"
         version:
           type: string
-          example: "0.1.0"
+          example: "1.0.0"
         timestamp:
           type: string
           format: date-time
