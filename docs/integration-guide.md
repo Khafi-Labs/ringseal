@@ -118,4 +118,4 @@ In v1.0 the signature key is the server's `MASTER_SECRET`, not a per-tenant secr
 ## 10. FAQ
 
 **Q: Can a customer have multiple active sessions?**
-A: No, only one active session per `customer_ref` is allowed.
+A: No. Only one live session per `customer_ref` exists at a time. Creating a new session ends the previous one, so the older code stops working.

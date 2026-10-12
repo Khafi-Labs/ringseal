@@ -39,7 +39,7 @@ Customer app (Ringseal SDK) --(Bearer JWT from bank)--+
 
 ## Abuse controls
 
-- One active session per customer per tenant, enforced by a partial unique index.
+- One live session per customer per tenant. Creating a session ends any earlier live one in the same transaction, and a partial unique index guards against races.
 - A cap on sessions created per customer per time window.
 - A cap on how many times a session's code can be fetched (`MAX_ATTEMPTS`, default 3).
 - Configurable code expiry. `.env.example` and the sample compose file use 60 seconds.
@@ -48,7 +48,7 @@ Customer app (Ringseal SDK) --(Bearer JWT from bank)--+
 
 ## Auditing and webhooks
 
-- Every create, read and view action writes an audit row with actor, authenticated principal, IP and user agent. The application database role has no UPDATE or DELETE on the audit table, and triggers reject modification.
+- Every create, read and view action writes an audit row with actor, authenticated principal, IP and user agent. Database triggers, created at startup, reject any UPDATE or DELETE on the audit table. Running the service under a database role without those privileges is an optional deployment hardening step (see `migrations/20261005_002_security_hardening.sql`).
 - Each audit row records the hash of the previous one for tamper evidence.
 - Tenants can receive webhooks (for example `session.viewed`). Deliveries are HTTPS-only by default, do not follow redirects, time out after 5 seconds, retry with backoff, and carry an HMAC-SHA256 signature.
 

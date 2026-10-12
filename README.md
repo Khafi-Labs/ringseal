@@ -42,11 +42,11 @@ Read more in [`research/`](research/): the [problem statement](research/01-probl
 ## Features
 
 - **Out-of-band verification** through the authenticated banking app, with no new secret for the customer to hand over.
-- **Short-lived codes**: uniform 6-digit codes (rejection sampling, no modulo bias), configurable expiry, a cap on fetches per session and one active session per customer.
+- **Short-lived codes**: uniform 6-digit codes (rejection sampling, no modulo bias), configurable expiry, a cap on fetches per session and one live session per customer (creating a new one ends the previous).
 - **Encrypted at rest**: AES-256-GCM, with the key derived from `MASTER_SECRET` and the tenant id bound as associated data. Ciphertext is set to NULL when a session ends or expires.
 - **Multi-tenant**: sessions, API keys and audit entries are scoped per tenant.
 - **Scoped API keys**: SHA-256 hashed at rest, with `create` / `read` / `end` scopes, expiry, IP allowlist and revocation.
-- **Audit log**: append-only table (no UPDATE or DELETE for the application role) with per-tenant hash linking.
+- **Audit log**: append-only (database triggers reject UPDATE and DELETE) with per-tenant hash linking. Restricting the application's database role further is a deployment step; see `migrations/`.
 - **Webhooks**: HMAC-signed, HTTPS-only by default, no redirects, retry with backoff.
 - **Hardened startup**: the server refuses short or known-weak secrets.
 - **Mobile SDKs** with ready-made, themeable verification screens. The Android SDK enables screenshot protection by default.
