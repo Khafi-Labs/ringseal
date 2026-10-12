@@ -1,3 +1,4 @@
+use axum::extract::rejection::JsonRejection;
 use axum::{
     extract::{Path, State},
     http::HeaderMap,
@@ -37,9 +38,16 @@ fn check_admin_secret(headers: &HeaderMap, config_secret: &str) -> Result<(), Ap
 pub async fn create(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
-    Json(payload): Json<CreateTenantRequest>,
+    payload: Result<Json<CreateTenantRequest>, JsonRejection>,
 ) -> Result<Json<CreateTenantResponse>, AppError> {
     check_admin_secret(&headers, &state.config.admin_secret)?;
+    let Json(payload) = payload?;
+
+    // Reject an unusable webhook URL up front rather than failing silently
+    // at delivery time.
+    if let Some(url) = payload.webhook_url.as_deref() {
+        crate::webhooks::validate_webhook_url(url, state.config.webhook_require_https)?;
+    }
 
     let tenant = state
         .db
@@ -74,9 +82,10 @@ pub async fn create_api_key(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
     Path(tenant_id): Path<Uuid>,
-    Json(payload): Json<CreateApiKeyRequest>,
+    payload: Result<Json<CreateApiKeyRequest>, JsonRejection>,
 ) -> Result<Json<CreateApiKeyResponse>, AppError> {
     check_admin_secret(&headers, &state.config.admin_secret)?;
+    let Json(payload) = payload?;
 
     let api_key_str = generate_api_key();
     let key_hash = hash_secret(&api_key_str);

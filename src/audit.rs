@@ -2,6 +2,7 @@ use crate::{db::Database, errors::AppError, models::AuditEntry};
 use sha2::{Digest, Sha256};
 use uuid::Uuid;
 
+#[allow(clippy::too_many_arguments)]
 pub async fn log_action(
     db: &Database,
     tenant_id: Uuid,

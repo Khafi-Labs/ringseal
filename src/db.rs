@@ -23,7 +23,9 @@ impl Database {
     }
 
     async fn run_migrations(&self) -> Result<(), sqlx::Error> {
-        sqlx::query(
+        // `raw_sql` (simple query protocol) is required: the schema below is
+        // several statements, which a prepared statement does not allow.
+        sqlx::raw_sql(
             r#"
             CREATE TABLE IF NOT EXISTS tenants (
                 id UUID PRIMARY KEY,
@@ -81,6 +83,28 @@ impl Database {
             CREATE INDEX IF NOT EXISTS idx_audit_log_tenant ON audit_log(tenant_id);
             CREATE INDEX IF NOT EXISTS idx_audit_log_session ON audit_log(session_id);
             CREATE INDEX IF NOT EXISTS idx_audit_log_created ON audit_log(created_at);
+
+            -- At most one live session per customer per tenant.
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_sessions_active_customer
+                ON sessions(tenant_id, customer_ref)
+                WHERE status IN ('created', 'active');
+
+            -- The audit log is append-only: reject UPDATE and DELETE.
+            CREATE OR REPLACE FUNCTION prevent_audit_modification()
+            RETURNS TRIGGER AS $$
+            BEGIN
+                RAISE EXCEPTION 'audit_log is append-only: modifications are not allowed';
+            END;
+            $$ LANGUAGE plpgsql;
+
+            DROP TRIGGER IF EXISTS audit_no_update ON audit_log;
+            DROP TRIGGER IF EXISTS audit_no_delete ON audit_log;
+            CREATE TRIGGER audit_no_update
+                BEFORE UPDATE ON audit_log
+                FOR EACH ROW EXECUTE FUNCTION prevent_audit_modification();
+            CREATE TRIGGER audit_no_delete
+                BEFORE DELETE ON audit_log
+                FOR EACH ROW EXECUTE FUNCTION prevent_audit_modification();
             "#,
         )
         .execute(&self.pool)
@@ -210,12 +234,26 @@ impl Database {
         let id = Uuid::new_v4();
         let created_at = Utc::now();
 
-        sqlx::query_as::<_, Session>(
+        // A new session supersedes any live one for the same customer, so the
+        // customer never has two valid codes. Ending and inserting share a
+        // transaction; the partial unique index guards against races.
+        let mut tx = self.pool.begin().await?;
+
+        sqlx::query(
+            "UPDATE sessions SET status = 'ended', ended_at = NOW(), code_encrypted = NULL \
+             WHERE tenant_id = $1 AND customer_ref = $2 AND status IN ('created', 'active')",
+        )
+        .bind(tenant_id)
+        .bind(customer_ref)
+        .execute(&mut *tx)
+        .await?;
+
+        let session = sqlx::query_as::<_, Session>(
             r#"
             INSERT INTO sessions (id, tenant_id, customer_ref, agent_ref, status, code_encrypted, code_expires_at, attempts, max_attempts, created_at)
             VALUES ($1, $2, $3, $4, 'created', $5, $6, 0, $7, $8)
             RETURNING id, tenant_id, customer_ref, agent_ref, status, code_encrypted, code_expires_at, attempts, max_attempts, created_at, ended_at
-            "#
+            "#,
         )
         .bind(id)
         .bind(tenant_id)
@@ -225,8 +263,11 @@ impl Database {
         .bind(expires_at)
         .bind(max_attempts)
         .bind(created_at)
-        .fetch_one(&self.pool)
-        .await
+        .fetch_one(&mut *tx)
+        .await?;
+
+        tx.commit().await?;
+        Ok(session)
     }
 
     pub async fn get_session(&self, id: Uuid) -> Result<Option<Session>, sqlx::Error> {

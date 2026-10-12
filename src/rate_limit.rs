@@ -62,6 +62,12 @@ pub struct RateLimiter {
     limits: Mutex<HashMap<String, SlidingWindow>>,
 }
 
+impl Default for RateLimiter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl RateLimiter {
     pub fn new() -> Self {
         Self {

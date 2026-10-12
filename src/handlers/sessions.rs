@@ -1,3 +1,4 @@
+use axum::extract::rejection::JsonRejection;
 use axum::{
     extract::{Path, Query, State},
     http::HeaderMap,
@@ -23,11 +24,12 @@ pub async fn create(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
     auth: TenantAuth,
-    Json(payload): Json<CreateSessionRequest>,
+    payload: Result<Json<CreateSessionRequest>, JsonRejection>,
 ) -> Result<Json<CreateSessionResponse>, AppError> {
     if !has_scope(&auth.api_key, "create") {
         return Err(AppError::Forbidden("Missing 'create' scope".into()));
     }
+    let Json(payload) = payload?;
 
     let customer_ref = normalize_ref(&payload.customer_ref);
     let agent_ref = normalize_ref(&payload.agent_ref);

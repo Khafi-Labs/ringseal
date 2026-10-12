@@ -40,7 +40,7 @@ impl FromRequestParts<Arc<AppState>> for TenantAuth {
             .db
             .get_api_key_by_hash(&hashed_key)
             .await
-            .map_err(|e| AppError::Database(e))?
+            .map_err(AppError::Database)?
             .ok_or_else(|| AppError::Unauthorized("Invalid API key".into()))?;
 
         if !tenant.active || !api_key.active {
@@ -112,6 +112,10 @@ impl FromRequestParts<Arc<AppState>> for CustomerAuth {
 
         let mut validation = Validation::new(jsonwebtoken::Algorithm::HS256);
         validation.set_required_spec_claims(&["exp"]);
+        // The library's own audience check rejects every token that carries an
+        // `aud` claim when no expected audience is configured. The audience is
+        // checked explicitly below instead: optional, but it must be "ringseal".
+        validation.validate_aud = false;
 
         let token_data = decode::<Claims>(
             token,
