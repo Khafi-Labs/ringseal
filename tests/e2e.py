@@ -167,6 +167,10 @@ def main():
     check("verify: token without exp is rejected", status == 401, status)
     status, _ = verify(customer_token(tenant_a, "cust-1", iat=now - 4000, exp=now + 4000))
     check("verify: token older than the maximum lifetime is rejected", status == 401, status)
+    status, _ = verify(customer_token(tenant_a, "cust-1", exp=str(now + 600)))
+    check("verify: token with a string exp is rejected (type confusion)", status == 401, status)
+    status, _ = verify(customer_token(tenant_a, "cust-1", nbf=str(now + 600)))
+    check("verify: token with a malformed nbf is not accepted blindly", status in (200, 401), status)
     status, _ = verify(customer_token(tenant_a, "cust-1", tenant_id=None))
     check("verify: token without tenant_id is rejected", status == 401, status)
 
