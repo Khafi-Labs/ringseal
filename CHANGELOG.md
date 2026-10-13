@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.0.2
+
+- Security: remove `rsa` (RUSTSEC-2023-0071, Marvin attack) from the dependency tree. JWT crypto now uses aws-lc-rs, sqlx is limited to PostgreSQL and updated to 0.9.
+- Update: rand 0.10, hmac 0.13 with sha2 0.11, tower-http 0.7, reqwest 0.13.
+
 ## 1.0.1
 
 Fixes found by the new end-to-end test suite. **Use this instead of 1.0.0.**

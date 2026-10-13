@@ -4,7 +4,7 @@ use aes_gcm::{
 };
 use hex;
 use hmac::{Hmac, Mac};
-use rand::Rng;
+use rand::RngExt;
 use sha2::{Digest, Sha256};
 use subtle::ConstantTimeEq;
 use uuid::Uuid;
@@ -27,8 +27,8 @@ pub fn verify_secret(secret: &str, hash: &str) -> bool {
 /// Derive a purpose-specific key from the master secret.
 /// Uses HMAC-SHA256(master, label) as a one-block KDF.
 pub fn derive_key(master: &[u8], label: &str) -> [u8; 32] {
-    let mut mac =
-        <Hmac<Sha256> as Mac>::new_from_slice(master).expect("HMAC can take key of any size");
+    let mut mac = <Hmac<Sha256> as hmac::KeyInit>::new_from_slice(master)
+        .expect("HMAC can take key of any size");
     mac.update(label.as_bytes());
     let result = mac.finalize();
     let mut key = [0u8; 32];
@@ -38,11 +38,11 @@ pub fn derive_key(master: &[u8], label: &str) -> [u8; 32] {
 
 /// Generate a 6-digit code with rejection sampling (no modulo bias).
 pub fn generate_code() -> String {
-    let mut rng = rand::thread_rng();
+    let mut rng = rand::rng();
     let mut code = String::with_capacity(6);
     for _ in 0..6 {
         loop {
-            let v: u8 = rng.gen();
+            let v: u8 = rng.random();
             if v < 250 {
                 code.push((b'0' + (v % 10)) as char);
                 break;

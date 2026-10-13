@@ -3,7 +3,7 @@ use axum::{
     http::{request::Parts, HeaderMap},
 };
 use jsonwebtoken::{decode, DecodingKey, Validation};
-use rand::RngCore;
+use rand::Rng;
 use std::sync::Arc;
 use uuid::Uuid;
 
@@ -171,6 +171,6 @@ pub fn has_scope(key: &TenantApiKey, scope: &str) -> bool {
 
 pub fn generate_api_key() -> String {
     let mut bytes = [0u8; 32];
-    rand::thread_rng().fill_bytes(&mut bytes);
+    rand::rng().fill_bytes(&mut bytes);
     format!("rsk_{}", hex::encode(bytes))
 }
