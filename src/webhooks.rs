@@ -76,7 +76,7 @@ pub async fn dispatch_webhook(
         .map_err(|_| AppError::Internal("Failed to serialize webhook payload".into()))?;
 
     type HmacSha256 = Hmac<Sha256>;
-    let mut mac = HmacSha256::new_from_slice(hmac_secret.as_bytes())
+    let mut mac = <HmacSha256 as hmac::KeyInit>::new_from_slice(hmac_secret.as_bytes())
         .map_err(|_| AppError::Internal("Invalid HMAC secret".into()))?;
     mac.update(body.as_bytes());
     let signature = hex::encode(mac.finalize().into_bytes());
