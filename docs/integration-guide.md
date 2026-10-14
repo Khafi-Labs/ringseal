@@ -32,7 +32,7 @@ Include your API Key in the `X-API-Key` header for all server-to-server requests
 ### Customer Authentication (JWT)
 Your backend must issue a JWT for the customer's device. The JWT must include a `customer_ref` claim.
 
-Required claims: `tenant_id` (your tenant UUID), `customer_ref` (the same reference your backend sends when creating sessions) and `exp`. Also set `iat` and `aud` (`"ringseal"`): the maximum-lifetime check only runs when `iat` is present. In v1.0 tokens are HS256, verified with the deployment's `MASTER_SECRET`. Keep token lifetimes short (5 minutes or less).
+Required claims: `tenant_id` (your tenant UUID), `customer_ref` (the same reference your backend sends when creating sessions) and `exp`. Also set `iat` and `aud` (`"ringseal"`): the maximum-lifetime check only runs when `iat` is present. In v1.1 tokens are HS256, verified with the deployment's `MASTER_SECRET`. Keep token lifetimes short (5 minutes or less).
 
 **Python JWT Example:**
 ```python
@@ -97,11 +97,11 @@ curl -X GET https://api.ringseal.com/api/v1/verify \
 
 ## 7. Webhooks
 
-If a tenant has a `webhook_url`, Ringseal sends a signed `POST` when a customer views a session (`session.viewed`, including IP address and user agent). Other lifecycle events (`session.created`, `session.ended`, `session.expired`) are not emitted in v1.0.
+If a tenant has a `webhook_url`, Ringseal sends a signed `POST` when a customer views a session (`session.viewed`, including IP address and user agent). Other lifecycle events (`session.created`, `session.ended`, `session.expired`) are not emitted in v1.1.
 
 Requests carry `X-Ringseal-Event-Id`, `X-Ringseal-Timestamp` and `X-Ringseal-Signature` (hex HMAC-SHA256 of the raw body). Deliveries require HTTPS by default, do not follow redirects, time out after 5 seconds and retry up to 3 times.
 
-In v1.0 the signature key is the server's `MASTER_SECRET`, not a per-tenant secret, so tenants cannot independently verify signatures yet. Per-tenant webhook secrets are on the roadmap. Until then, treat webhooks as notifications and confirm state through the API.
+In v1.1 the signature key is the server's `MASTER_SECRET`, not a per-tenant secret, so tenants cannot independently verify signatures yet. Per-tenant webhook secrets are on the roadmap. Until then, treat webhooks as notifications and confirm state through the API.
 
 ## 8. Security Best Practices
 

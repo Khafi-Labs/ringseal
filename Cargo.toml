@@ -1,6 +1,6 @@
 [package]
 name = "ringseal"
-version = "1.0.2"
+version = "1.1.0"
 edition = "2021"
 license = "Apache-2.0"
 description = "Multi-tenant caller-verification API for banks"

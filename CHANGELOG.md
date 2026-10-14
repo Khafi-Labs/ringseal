@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.1.0
+
+- Security: rate limits are now enforced (they were implemented but never called). Per client address and per credential, a stricter limit for requests with no credential, `429` with `Retry-After`, health check exempt.
+- Security: the client address comes from the socket unless `TRUSTED_PROXY_COUNT` says otherwise. `X-Forwarded-For` is ignored with no trusted proxy, the proxy-count off-by-one is fixed, and a client-supplied internal address header is discarded.
+- Security: CORS is closed by default; set `CORS_ALLOWED_ORIGINS` (`*` for demos). This is a behaviour change for browser callers.
+- Fix: replicas starting at the same time deadlocked while creating the schema; setup now runs under a PostgreSQL advisory lock.
+- Tests: 17 unit tests, and the end-to-end suite grew to 55 checks plus 7 rate-limit checks run against a second server with low limits.
+
 ## 1.0.2
 
 - Security: remove `rsa` (RUSTSEC-2023-0071, Marvin attack) from the dependency tree. JWT crypto now uses aws-lc-rs, sqlx is limited to PostgreSQL and updated to 0.9.

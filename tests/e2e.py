@@ -75,6 +75,18 @@ def call(method, url, headers=None, body=None):
             return err.code, raw.decode(errors="replace")
 
 
+def call_h(method, url, headers=None):
+    """Like call(), but returns (status, response headers)."""
+    req = urllib.request.Request(url, method=method)
+    for k, v in (headers or {}).items():
+        req.add_header(k, v)
+    try:
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            return resp.status, dict(resp.headers)
+    except urllib.error.HTTPError as err:
+        return err.code, dict(err.headers)
+
+
 def admin(method, path, body=None, secret=ADMIN_SECRET):
     headers = {"X-Admin-Secret": secret} if secret is not None else {}
     return call(method, INTERNAL + path, headers, body)
@@ -253,10 +265,32 @@ def main():
     capped = [api("POST", "/api/v1/sessions", key_a, {"customer_ref": "cust-cap", "agent_ref": "a"})[0] for _ in range(6)]
     check("sessions: creation per customer is capped", capped[0] == 200 and 400 in capped, capped)
 
+    # --- CORS is closed by default ----------------------------------------
+    status, hdrs = call_h(
+        "OPTIONS",
+        PUBLIC + "/api/v1/sessions",
+        {"Origin": "https://evil.example", "Access-Control-Request-Method": "POST"},
+    )
+    lowered = {k.lower() for k in hdrs}
+    check("cors: unknown origins get no allow-origin header", "access-control-allow-origin" not in lowered, hdrs)
+
+    # --- client address cannot be forged -----------------------------------
+    call_h(
+        "GET",
+        PUBLIC + "/api/v1/verify",
+        {
+            "Authorization": f"Bearer {customer_token(tenant_a, 'cust-spoof')}",
+            "X-Forwarded-For": "7.7.7.7",
+            "X-Ringseal-Client-Ip": "6.6.6.6",
+        },
+    )
+
     # --- database-level guarantees (need PSQL_URL) -------------------------
     if PSQL_URL:
         rc, out = psql("SELECT count(*) FROM audit_log")
         check("db: audit log has entries", rc == 0 and int(out or 0) > 0, out)
+        rc, out = psql("SELECT count(*) FROM audit_log WHERE ip_address IN ('7.7.7.7', '6.6.6.6')")
+        check("ip: forged X-Forwarded-For and client-ip headers never reach the audit log", rc == 0 and out == "0", out)
         rc, out = psql("UPDATE audit_log SET actor = 'tampered'")
         check("db: audit log rejects UPDATE", rc != 0 and "append-only" in out, out)
         rc, out = psql("DELETE FROM audit_log")

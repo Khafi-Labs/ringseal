@@ -78,22 +78,38 @@ jobs:
       INTERNAL_PORT: "9090"
       CODE_EXPIRY_SECONDS: "60"
       MAX_ATTEMPTS: "3"
+      RATE_LIMIT_REQUESTS: "5000"
+      UNAUTH_RATE_LIMIT_REQUESTS: "5000"
       RUST_LOG: ringseal=info
     steps:
       - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       - run: cargo build --locked
-      - name: Start server
+      - name: Start two servers at once
+        # The second instance has low rate limits. Starting both together also
+        # proves that concurrent schema setup (advisory lock) does not deadlock.
         run: |
           ./target/debug/ringseal > server.log 2>&1 &
-          for i in $(seq 1 30); do
-            curl -fs http://127.0.0.1:8080/api/v1/health && exit 0
-            sleep 1
+          PORT=8081 INTERNAL_PORT=9091 RATE_LIMIT_REQUESTS=10 UNAUTH_RATE_LIMIT_REQUESTS=5 \
+            ./target/debug/ringseal > server2.log 2>&1 &
+          for port in 8080 8081; do
+            ok=0
+            for i in $(seq 1 30); do
+              if curl -fs http://127.0.0.1:$port/api/v1/health > /dev/null; then ok=1; break; fi
+              sleep 1
+            done
+            if [ "$ok" != 1 ]; then
+              echo "server on $port did not become healthy"; cat server.log server2.log; exit 1
+            fi
           done
-          echo "server did not become healthy" && cat server.log && exit 1
       - name: Run end-to-end tests
         run: python3 tests/e2e.py
-      - name: Server log
+      - name: Run rate-limit tests
+        env:
+          RINGSEAL_URL: http://127.0.0.1:8081
+          RINGSEAL_INTERNAL: http://127.0.0.1:9091
+        run: python3 tests/e2e_ratelimit.py
+      - name: Server logs
         if: failure()
-        run: cat server.log
+        run: cat server.log server2.log

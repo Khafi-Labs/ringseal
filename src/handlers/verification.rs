@@ -33,7 +33,7 @@ pub async fn get_active_session(
         .map_err(AppError::Database)?
         .ok_or_else(|| AppError::NotFound("Tenant not found".into()))?;
 
-    let ip = extract_client_ip(&headers, state.config.trusted_proxy_count);
+    let ip = extract_client_ip(&headers);
     let ua = extract_user_agent(&headers);
 
     log_action(
