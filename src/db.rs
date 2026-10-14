@@ -23,9 +23,19 @@ impl Database {
     }
 
     async fn run_migrations(&self) -> Result<(), sqlx::Error> {
+        // Several replicas can start at once. A session-level advisory lock on
+        // one dedicated connection makes them set up the schema one at a time;
+        // without it, concurrent DDL deadlocks.
+        const MIGRATION_LOCK_ID: i64 = 7_243_318_001;
+        let mut conn = self.pool.acquire().await?;
+        sqlx::query("SELECT pg_advisory_lock($1)")
+            .bind(MIGRATION_LOCK_ID)
+            .execute(&mut *conn)
+            .await?;
+
         // `raw_sql` (simple query protocol) is required: the schema below is
         // several statements, which a prepared statement does not allow.
-        sqlx::raw_sql(
+        let result = sqlx::raw_sql(
             r#"
             CREATE TABLE IF NOT EXISTS tenants (
                 id UUID PRIMARY KEY,
@@ -107,10 +117,16 @@ impl Database {
                 FOR EACH ROW EXECUTE FUNCTION prevent_audit_modification();
             "#,
         )
-        .execute(&self.pool)
-        .await?;
+        .execute(&mut *conn)
+        .await;
 
-        Ok(())
+        // Release the lock whether or not the schema setup succeeded.
+        sqlx::query("SELECT pg_advisory_unlock($1)")
+            .bind(MIGRATION_LOCK_ID)
+            .execute(&mut *conn)
+            .await?;
+
+        result.map(|_| ())
     }
 
     pub async fn create_tenant(

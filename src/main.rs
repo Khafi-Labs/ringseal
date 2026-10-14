@@ -10,11 +10,12 @@ pub mod rate_limit;
 pub mod webhooks;
 
 use axum::{
-    extract::Request,
-    http::StatusCode,
+    extract::{ConnectInfo, Request, State},
+    http::{header, HeaderMap, HeaderName, HeaderValue, Method, StatusCode},
     middleware::{self, Next},
-    response::Response,
+    response::{IntoResponse, Response},
 };
+use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::net::TcpListener;
@@ -46,6 +47,96 @@ async fn security_headers_middleware(req: Request, next: Next) -> Response {
     response
 }
 
+/// Resolves the real client address, then enforces rate limits.
+///
+/// Limits are per client IP and per presented credential (hashed, so no secret
+/// is kept in memory). Requests with no credential also count against the
+/// stricter anonymous limit. The health check is exempt.
+async fn request_guard_middleware(
+    State(state): State<Arc<AppState>>,
+    ConnectInfo(peer): ConnectInfo<SocketAddr>,
+    mut req: Request,
+    next: Next,
+) -> Response {
+    let xff = req
+        .headers()
+        .get("x-forwarded-for")
+        .and_then(|h| h.to_str().ok());
+    let ip = auth::resolve_client_ip(peer.ip(), xff, state.config.trusted_proxy_count);
+
+    // Never trust a client-supplied value for the internal header.
+    req.headers_mut().remove(auth::CLIENT_IP_HEADER);
+    if let Ok(value) = HeaderValue::from_str(&ip) {
+        req.headers_mut()
+            .insert(HeaderName::from_static(auth::CLIENT_IP_HEADER), value);
+    }
+
+    if req.uri().path() != "/api/v1/health" {
+        if let Err(err) = check_rate_limits(&state, &ip, req.headers()) {
+            let mut response = err.into_response();
+            response.headers_mut().insert(
+                header::RETRY_AFTER,
+                HeaderValue::from(state.config.rate_limit_window_seconds),
+            );
+            return response;
+        }
+    }
+
+    next.run(req).await
+}
+
+fn check_rate_limits(
+    state: &AppState,
+    ip: &str,
+    headers: &HeaderMap,
+) -> Result<(), errors::AppError> {
+    let cfg = &state.config;
+    state.rate_limiter.check_ip_rate_limit(
+        ip,
+        cfg.rate_limit_requests,
+        cfg.rate_limit_window_seconds,
+    )?;
+
+    let credential = headers
+        .get("x-api-key")
+        .or_else(|| headers.get(header::AUTHORIZATION))
+        .and_then(|h| h.to_str().ok());
+
+    match credential {
+        Some(credential) => {
+            let digest = code_gen::hash_secret(credential);
+            state.rate_limiter.check_rate_limit(
+                &format!("cred:{}", &digest[..16]),
+                cfg.rate_limit_requests,
+                cfg.rate_limit_window_seconds,
+            )
+        }
+        None => state.rate_limiter.check_rate_limit(
+            &format!("anon:{ip}"),
+            cfg.unauth_rate_limit_requests,
+            cfg.unauth_rate_limit_window_seconds,
+        ),
+    }
+}
+
+/// CORS for browser callers (the demo pages). Closed unless origins are
+/// configured with `CORS_ALLOWED_ORIGINS`; `*` allows any origin.
+fn build_cors(origins: &[String]) -> CorsLayer {
+    let base = CorsLayer::new()
+        .allow_methods([Method::GET, Method::POST])
+        .allow_headers([
+            header::AUTHORIZATION,
+            header::CONTENT_TYPE,
+            HeaderName::from_static("x-api-key"),
+        ]);
+    if origins.iter().any(|o| o == "*") {
+        base.allow_origin(Any)
+    } else {
+        let allowed: Vec<HeaderValue> = origins.iter().filter_map(|o| o.parse().ok()).collect();
+        base.allow_origin(allowed)
+    }
+}
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Initialize structured logging
@@ -73,11 +164,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         rate_limiter,
     });
 
-    // F-13: CORS — restrict in production, permissive for dev
-    let cors = CorsLayer::new()
-        .allow_origin(Any)
-        .allow_methods(Any)
-        .allow_headers(Any);
+    // F-13: CORS is closed unless CORS_ALLOWED_ORIGINS lists origins.
+    let cors = build_cors(&state.config.cors_allowed_origins);
 
     // Public API — sessions, verification, health
     let public_app = handlers::public_router()
@@ -87,6 +175,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .layer(TimeoutLayer::with_status_code(
             StatusCode::REQUEST_TIMEOUT,
             Duration::from_secs(30),
+        ))
+        // Outermost: resolves the client address and enforces rate limits
+        // before any other layer or handler runs.
+        .layer(middleware::from_fn_with_state(
+            state.clone(),
+            request_guard_middleware,
         ))
         .with_state(state.clone());
 
@@ -131,7 +225,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Start public listener
     tracing::info!(addr = %addr_public, "Public API listening");
     let listener = TcpListener::bind(&addr_public).await?;
-    axum::serve(listener, public_app).await?;
+    axum::serve(
+        listener,
+        public_app.into_make_service_with_connect_info::<SocketAddr>(),
+    )
+    .await?;
 
     Ok(())
 }

@@ -71,7 +71,7 @@ pub async fn create(
         .await
         .map_err(AppError::Database)?;
 
-    let ip = extract_client_ip(&headers, state.config.trusted_proxy_count);
+    let ip = extract_client_ip(&headers);
     let ua = extract_user_agent(&headers);
     let principal = auth.api_key.label.clone();
 
@@ -116,7 +116,7 @@ pub async fn get(
         return Err(AppError::NotFound("Session not found".into()));
     }
 
-    let ip = extract_client_ip(&headers, state.config.trusted_proxy_count);
+    let ip = extract_client_ip(&headers);
     let ua = extract_user_agent(&headers);
     let principal = auth.api_key.label.clone();
 
@@ -163,7 +163,7 @@ pub async fn get_active(
         .map_err(AppError::Database)?
         .ok_or_else(|| AppError::NotFound("Active session not found".into()))?;
 
-    let ip = extract_client_ip(&headers, state.config.trusted_proxy_count);
+    let ip = extract_client_ip(&headers);
     let ua = extract_user_agent(&headers);
     let principal = auth.api_key.label.clone();
 
@@ -214,7 +214,7 @@ pub async fn end(
 
     state.db.end_session(id).await.map_err(AppError::Database)?;
 
-    let ip = extract_client_ip(&headers, state.config.trusted_proxy_count);
+    let ip = extract_client_ip(&headers);
     let ua = extract_user_agent(&headers);
     let principal = auth.api_key.label.clone();
 

@@ -25,6 +25,8 @@ pub struct AppConfig {
     pub rate_limit_window_seconds: u64,
     pub unauth_rate_limit_requests: u64,
     pub unauth_rate_limit_window_seconds: u64,
+    /// Origins allowed to call the public API from a browser. Empty = none, `*` = any.
+    pub cors_allowed_origins: Vec<String>,
     pub master_secret: String,
     pub admin_secret: String,
     pub trusted_proxy_count: usize,
@@ -116,6 +118,13 @@ impl AppConfig {
             .map(|v| v == "true" || v == "1")
             .unwrap_or(true);
 
+        let cors_allowed_origins = env::var("CORS_ALLOWED_ORIGINS")
+            .unwrap_or_default()
+            .split(',')
+            .map(|o| o.trim().to_string())
+            .filter(|o| !o.is_empty())
+            .collect();
+
         Self {
             database_url,
             host,
@@ -129,6 +138,7 @@ impl AppConfig {
             rate_limit_window_seconds,
             unauth_rate_limit_requests,
             unauth_rate_limit_window_seconds,
+            cors_allowed_origins,
             master_secret,
             admin_secret,
             trusted_proxy_count,

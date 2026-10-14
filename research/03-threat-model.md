@@ -1,6 +1,6 @@
 # 3. Threat model
 
-Scope: Ringseal API v1.0 as published in this repository. This is a design-level review written by the authors. It is not a third-party audit.
+Scope: Ringseal API v1.1 as published in this repository. This is a design-level review written by the authors. It is not a third-party audit.
 
 ## Assets
 
@@ -40,22 +40,20 @@ Scope: Ringseal API v1.0 as published in this repository. This is a design-level
 | F. Database reader | Codes are stored only as AES-256-GCM ciphertext, wiped on end or expiry. API keys are stored only as hashes. | A reader who also gets `MASTER_SECRET` can decrypt live codes. Keep the secret outside the database host and backups. |
 | G. Insider | Per-key scopes, IP allowlists, key expiry and audit entries with principal names. | A fully privileged bank insider can create sessions. Detection depends on reviewing the audit log. |
 
-## Known limitations (v1.0)
+## Known limitations (v1.1)
 
 These are listed openly so adopters can plan around them. Fixes are planned.
 
-1. **Rate limiting is not enforced.** A sliding-window limiter and its settings (`RATE_LIMIT_*`, `UNAUTH_RATE_LIMIT_*`) are implemented, but no request path calls it yet. Until it is wired in, put rate limiting in front of the service (reverse proxy or gateway). Session creation per customer is still capped separately, and fetches per session by `MAX_ATTEMPTS`.
-2. **Shared-secret customer tokens.** Customer JWTs are HS256, verified with `MASTER_SECRET`. The bank must therefore hold the same secret that decrypts stored codes and signs webhooks. Planned: switch to Ed25519 (EdDSA) so banks sign with a private key and Ringseal only holds a public key, and separate keys per purpose.
-3. **Optional token claims.** `iat`, `aud` and `jti` are optional. The maximum-lifetime check runs only when `iat` is present, and there is no replay tracking by `jti`. Only `exp` is required. Planned: require `iat`, `aud` and `jti`, and cache used `jti` values for their lifetime.
-4. **Webhook URL validation is string-based.** Private ranges are blocked by hostname prefix. It does not resolve DNS, so hostnames that resolve to private addresses, alternative IP notations and similar tricks may pass. Redirects are disabled, which limits but does not remove the risk. Planned: resolve and validate the connecting IP at dispatch time.
-5. **Client IP comes only from `X-Forwarded-For`.** With no trusted proxy configured, requests without the header all share the identity "unknown", and a client-supplied header can influence the address. This affects IP allowlists, rate limits and audit entries. Deploy behind a proxy that sets the header and set `TRUSTED_PROXY_COUNT` correctly.
-6. **Rate limiter design.** Once wired in, it is per process and in memory, so limits are not shared between replicas and reset on restart.
-7. **Audit chain is not serialized.** The previous hash is read and the new row inserted in separate steps, so concurrent writes for one tenant can fork the chain. No verification tool is included yet.
-8. **Attempts count fetches, not wrong guesses.** Each code fetch uses one of `MAX_ATTEMPTS`, so app retries on a weak network can exhaust a session.
-9. **Code expiry default.** If `CODE_EXPIRY_SECONDS` is unset the server defaults to 300 seconds. The provided `.env.example` and compose file set 60.
-10. **Permissive CORS.** The public API currently allows any origin, method and header. Restrict it for production.
-11. **Webhook signing.** Webhooks are signed with `MASTER_SECRET`, not a per-tenant secret, so tenants cannot verify them independently, and only `session.viewed` is emitted. Planned: per-tenant webhook secrets and the full event set.
-12. **No external audit or fuzzing yet.**
+1. **Shared-secret customer tokens.** Customer JWTs are HS256, verified with `MASTER_SECRET`. The bank must therefore hold the same secret that decrypts stored codes and signs webhooks. Planned: switch to Ed25519 (EdDSA) so banks sign with a private key and Ringseal only holds a public key, and separate keys per purpose.
+2. **Optional token claims.** `iat`, `aud` and `jti` are optional. The maximum-lifetime check runs only when `iat` is present, and there is no replay tracking by `jti`. Only `exp` is required. Planned: require `iat`, `aud` and `jti`, and cache used `jti` values for their lifetime.
+3. **Webhook URL validation is string-based.** Private ranges are blocked by hostname prefix. It does not resolve DNS, so hostnames that resolve to private addresses, alternative IP notations and similar tricks may pass. Redirects are disabled, which limits but does not remove the risk. Planned: resolve and validate the connecting IP at dispatch time.
+4. **Rate limits are per process.** Requests are limited per client address and per presented credential, with a stricter limit for requests that carry no credential, but the counters live in memory: they are not shared between replicas and reset on restart. Use a gateway for global limits.
+5. **Client address behind proxies.** With `TRUSTED_PROXY_COUNT=0` the socket address is used and `X-Forwarded-For` is ignored. Behind proxies the count must match the real number of trusted proxies: too low and every client appears as the proxy (shared limits, wrong allowlist match); too high and a forged address can be trusted.
+6. **Audit chain is not serialized.** The previous hash is read and the new row inserted in separate steps, so concurrent writes for one tenant can fork the chain. No verification tool is included yet.
+7. **Attempts count fetches, not wrong guesses.** Each code fetch uses one of `MAX_ATTEMPTS`, so app retries on a weak network can exhaust a session.
+8. **Code expiry default.** If `CODE_EXPIRY_SECONDS` is unset the server defaults to 300 seconds. The provided `.env.example` and compose file set 60.
+9. **Webhook signing.** Webhooks are signed with `MASTER_SECRET`, not a per-tenant secret, so tenants cannot verify them independently, and only `session.viewed` is emitted. Planned: per-tenant webhook secrets and the full event set.
+10. **No external audit or fuzzing yet.**
 
 ## What Ringseal does not protect against
 

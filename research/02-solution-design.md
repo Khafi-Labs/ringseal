@@ -43,8 +43,10 @@ Customer app (Ringseal SDK) --(Bearer JWT from bank)--+
 - A cap on sessions created per customer per time window.
 - A cap on how many times a session's code can be fetched (`MAX_ATTEMPTS`, default 3).
 - Configurable code expiry. `.env.example` and the sample compose file use 60 seconds.
-- A sliding-window rate limiter and its configuration exist, but v1.0 does not yet apply it to incoming requests (see limitations in the threat model).
+- Sliding-window rate limits per client address and per presented credential (hashed in memory), with a stricter limit for requests that carry no credential. Excess requests get `429` with `Retry-After`; the health check is exempt. The client address is the socket peer, or the n-th entry from the right of `X-Forwarded-For` when `TRUSTED_PROXY_COUNT=n`; any client-supplied internal address header is discarded.
+- CORS is closed unless `CORS_ALLOWED_ORIGINS` lists origins (`*` allows any, for demos).
 - Startup checks reject short or known-weak secrets.
+- Schema setup runs under a PostgreSQL advisory lock, so several replicas can start at once.
 
 ## Auditing and webhooks
 

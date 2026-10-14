@@ -6,11 +6,11 @@
 
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue)](LICENSE)
 ![Rust](https://img.shields.io/badge/rust-stable-orange)
-![Status](https://img.shields.io/badge/status-v1.0%20pre--release-yellow)
+![Status](https://img.shields.io/badge/status-v1.1%20pre--release-yellow)
 
 </div>
 
-> **Status:** v1.0, pre-release, not externally audited. Read the [known limitations](research/03-threat-model.md#known-limitations-v10) before deploying to production.
+> **Status:** v1.1, pre-release, not externally audited. Read the [known limitations](research/03-threat-model.md#known-limitations-v11) before deploying to production.
 
 ## Overview
 
@@ -48,7 +48,8 @@ Read more in [`research/`](research/): the [problem statement](research/01-probl
 - **Scoped API keys**: SHA-256 hashed at rest, with `create` / `read` / `end` scopes, expiry, IP allowlist and revocation.
 - **Audit log**: append-only (database triggers reject UPDATE and DELETE) with per-tenant hash linking. Restricting the application's database role further is a deployment step; see `migrations/`.
 - **Webhooks**: HMAC-signed, HTTPS-only by default, no redirects, retry with backoff.
-- **Hardened startup**: the server refuses short or known-weak secrets.
+- **Rate limiting**: per client address and per credential, `429` with `Retry-After`, health check exempt.
+- **Hardened startup**: the server refuses short or known-weak secrets, and replicas can start together safely.
 - **Mobile SDKs** with ready-made, themeable verification screens. The Android SDK enables screenshot protection by default.
 
 ## Quick start
@@ -118,7 +119,7 @@ Full contract: [`openapi/openapi.yaml`](openapi/openapi.yaml). Guide: [`docs/int
 | Customer app | `Authorization: Bearer <JWT>`, issued by the bank |
 | Operator | `X-Admin-Secret` header, internal listener only |
 
-Customer JWTs are HS256 in v1.0, verified with `MASTER_SECRET`. Claims:
+Customer JWTs are HS256 in v1.1, verified with `MASTER_SECRET`. Claims:
 
 | Claim | Required | Notes |
 |---|---|---|
@@ -145,7 +146,9 @@ All settings are environment variables; see [`.env.example`](.env.example).
 | `MAX_JWT_LIFETIME_SECONDS` | `300` | Maximum token age when `iat` is set |
 | `TRUSTED_PROXY_COUNT` | `0` | Reverse proxies in front of the service (for `X-Forwarded-For`) |
 | `WEBHOOK_REQUIRE_HTTPS` | `true` | Require HTTPS for webhook URLs |
-| `RATE_LIMIT_*`, `UNAUTH_RATE_LIMIT_*` | `100`/`60`, `20`/`60` | Reserved. The limiter is not yet applied to requests |
+| `RATE_LIMIT_REQUESTS` / `RATE_LIMIT_WINDOW_SECONDS` | `100` / `60` | Per client address and per credential |
+| `UNAUTH_RATE_LIMIT_REQUESTS` / `UNAUTH_RATE_LIMIT_WINDOW_SECONDS` | `20` / `60` | Per client address, for requests with no credential |
+| `CORS_ALLOWED_ORIGINS` | empty | Comma-separated browser origins allowed to call the API; `*` allows any (demos only) |
 | `RUST_LOG` | `ringseal=info,tower_http=info` | Log filter |
 
 ## SDKs
@@ -160,12 +163,12 @@ Demos: open [`demo/agent-console/index.html`](demo/agent-console/index.html) and
 
 ## Security
 
-Ringseal handles authentication material, so please read [`research/03-threat-model.md`](research/03-threat-model.md). Highlights for v1.0:
+Ringseal handles authentication material, so please read [`research/03-threat-model.md`](research/03-threat-model.md). Highlights for v1.1:
 
-- Request rate limiting is not enforced yet; put limits in a reverse proxy or gateway.
+- Rate limits are per process and in memory; use a gateway for limits shared across replicas.
 - Customer tokens use a shared secret (HS256). Moving to Ed25519 is planned.
 - Webhook URL validation and webhook signing need hardening.
-- Restrict CORS and run behind TLS in production.
+- Run behind TLS in production; CORS is closed unless you configure origins.
 
 To report a vulnerability, see [SECURITY.md](SECURITY.md). Please do not open public issues for security problems.
 
@@ -197,7 +200,7 @@ demo/           Agent console and customer app demos
 ## Roadmap
 
 - Ed25519-signed customer tokens and separate keys per purpose
-- Enforced, shared rate limiting
+- Rate limits shared across replicas
 - Per-tenant webhook secrets and the full session event set
 - Hardened webhook destination checks
 - Required `iat`, `aud` and `jti` with replay protection

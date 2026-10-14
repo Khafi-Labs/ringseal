@@ -4,6 +4,7 @@ use axum::{
 };
 use jsonwebtoken::{decode, DecodingKey, Validation};
 use rand::Rng;
+use std::net::IpAddr;
 use std::sync::Arc;
 use uuid::Uuid;
 
@@ -56,7 +57,7 @@ impl FromRequestParts<Arc<AppState>> for TenantAuth {
         }
 
         if let Some(allowlist) = &api_key.ip_allowlist {
-            let client_ip = extract_client_ip(headers, app_state.config.trusted_proxy_count);
+            let client_ip = extract_client_ip(headers);
             if !allowlist.split(',').any(|ip| ip.trim() == client_ip) {
                 return Err(AppError::Forbidden("IP address not in allowlist".into()));
             }
@@ -148,14 +149,43 @@ impl FromRequestParts<Arc<AppState>> for CustomerAuth {
     }
 }
 
-pub fn extract_client_ip(headers: &HeaderMap, trusted_proxy_count: usize) -> String {
-    if let Some(xff) = headers.get("X-Forwarded-For").and_then(|h| h.to_str().ok()) {
-        let parts: Vec<&str> = xff.split(',').map(|s| s.trim()).collect();
-        if parts.len() > trusted_proxy_count {
-            return parts[parts.len() - 1 - trusted_proxy_count].to_string();
+/// Header set by the request-guard middleware once it has resolved the real
+/// client address. Any value sent by a client is discarded.
+pub const CLIENT_IP_HEADER: &str = "x-ringseal-client-ip";
+
+/// Resolve the client address.
+///
+/// With no trusted proxy the socket peer is used and `X-Forwarded-For` is
+/// ignored, because the client controls it. With `n` trusted proxies, each of
+/// which appends the address it saw, the client is the n-th entry from the
+/// right; anything further left may have been forged by the client.
+pub fn resolve_client_ip(peer: IpAddr, xff: Option<&str>, trusted_proxy_count: usize) -> String {
+    if trusted_proxy_count == 0 {
+        return peer.to_string();
+    }
+    if let Some(xff) = xff {
+        let parts: Vec<&str> = xff
+            .split(',')
+            .map(|s| s.trim())
+            .filter(|s| !s.is_empty())
+            .collect();
+        if parts.len() >= trusted_proxy_count {
+            let candidate = parts[parts.len() - trusted_proxy_count];
+            if candidate.parse::<IpAddr>().is_ok() {
+                return candidate.to_string();
+            }
         }
     }
-    "unknown".to_string()
+    peer.to_string()
+}
+
+/// The client address resolved by the request-guard middleware.
+pub fn extract_client_ip(headers: &HeaderMap) -> String {
+    headers
+        .get(CLIENT_IP_HEADER)
+        .and_then(|h| h.to_str().ok())
+        .unwrap_or("unknown")
+        .to_string()
 }
 
 pub fn extract_user_agent(headers: &HeaderMap) -> Option<String> {
@@ -173,4 +203,66 @@ pub fn generate_api_key() -> String {
     let mut bytes = [0u8; 32];
     rand::rng().fill_bytes(&mut bytes);
     format!("rsk_{}", hex::encode(bytes))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn peer() -> IpAddr {
+        "203.0.113.9".parse().unwrap()
+    }
+
+    #[test]
+    fn without_trusted_proxies_the_header_is_ignored() {
+        assert_eq!(
+            resolve_client_ip(peer(), Some("198.51.100.1"), 0),
+            "203.0.113.9"
+        );
+    }
+
+    #[test]
+    fn one_proxy_uses_the_last_entry() {
+        assert_eq!(
+            resolve_client_ip(peer(), Some("6.6.6.6, 198.51.100.1"), 1),
+            "198.51.100.1"
+        );
+    }
+
+    #[test]
+    fn two_proxies_use_the_second_entry_from_the_right() {
+        assert_eq!(
+            resolve_client_ip(peer(), Some("6.6.6.6, 198.51.100.1, 192.0.2.7"), 2),
+            "198.51.100.1"
+        );
+    }
+
+    #[test]
+    fn forged_leading_entries_are_not_trusted() {
+        let ip = resolve_client_ip(peer(), Some("1.1.1.1, 2.2.2.2, 198.51.100.1"), 1);
+        assert_eq!(ip, "198.51.100.1");
+    }
+
+    #[test]
+    fn too_few_entries_or_garbage_fall_back_to_the_peer() {
+        assert_eq!(
+            resolve_client_ip(peer(), Some("198.51.100.1"), 2),
+            "203.0.113.9"
+        );
+        assert_eq!(
+            resolve_client_ip(peer(), Some("not-an-ip"), 1),
+            "203.0.113.9"
+        );
+        assert_eq!(resolve_client_ip(peer(), None, 1), "203.0.113.9");
+    }
+
+    #[test]
+    fn extract_reads_the_internal_header_only() {
+        let mut h = HeaderMap::new();
+        assert_eq!(extract_client_ip(&h), "unknown");
+        h.insert("x-forwarded-for", "9.9.9.9".parse().unwrap());
+        assert_eq!(extract_client_ip(&h), "unknown");
+        h.insert(CLIENT_IP_HEADER, "198.51.100.1".parse().unwrap());
+        assert_eq!(extract_client_ip(&h), "198.51.100.1");
+    }
 }
